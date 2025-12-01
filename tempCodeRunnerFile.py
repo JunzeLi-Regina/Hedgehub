@@ -3,14 +3,11 @@ from shinywidgets import output_widget, render_widget
 import pandas as pd
 import plotly.express as px
 
-# Backend logic
+# Backend pairs trading engine
 from strategy_engine import analyze_pair
 
 
-# ---------------------------------------------------------
-# UI PANELS
-# ---------------------------------------------------------
-
+# ---------- UI PANELS ----------
 def make_home_panel() -> ui.nav_panel:
     return ui.nav_panel(
         "Home",
@@ -18,8 +15,16 @@ def make_home_panel() -> ui.nav_panel:
             ui.column(
                 12,
                 ui.card(
-                    ui.h1("Welcome to HedgeHub", class_="text-center", style="color:#00E6A8;"),
-                    ui.h4("Smart Pair Trading Analysis Platform", class_="text-center", style="color:#00E6A8;"),
+                    ui.h1(
+                        "Welcome to HedgeHub",
+                        class_="text-center",
+                        style="color:#00E6A8;"
+                    ),
+                    ui.h4(
+                        "Smart Pair Trading Analysis Platform",
+                        class_="text-center",
+                        style="color:#00E6A8;"
+                    ),
                     ui.hr(),
 
                     ui.tags.iframe(
@@ -41,18 +46,24 @@ def make_home_panel() -> ui.nav_panel:
                         },
                         ui.card(
                             ui.h4("Analyze Pairs", style="color:#00E6A8; text-align:center;"),
-                            ui.p("Test if two stocks form a cointegrated pair.",
-                                 style="text-align:center; color:#CCCCCC;")
+                            ui.p(
+                                "Test if two stocks form a cointegrated pair.",
+                                style="text-align:center; color:#CCCCCC;"
+                            )
                         ),
                         ui.card(
                             ui.h4("Generate Strategy", style="color:#00E6A8; text-align:center;"),
-                            ui.p("Get long/short suggestions based on signals.",
-                                 style="text-align:center; color:#CCCCCC;")
+                            ui.p(
+                                "Get long/short suggestions based on signals.",
+                                style="text-align:center; color:#CCCCCC;"
+                            )
                         ),
                         ui.card(
                             ui.h4("Market Insights", style="color:#00E6A8; text-align:center;"),
-                            ui.p("Follow financial news and sentiment for your pair.",
-                                 style="text-align:center; color:#CCCCCC;")
+                            ui.p(
+                                "Follow financial news and sentiment for your pair.",
+                                style="text-align:center; color:#CCCCCC;"
+                            )
                         )
                     ),
 
@@ -61,7 +72,7 @@ def make_home_panel() -> ui.nav_panel:
                         "go_to_analysis",
                         "Start Analysis",
                         class_="btn btn-success btn-lg d-block mx-auto shadow-green"
-                    )
+                    ),
                 )
             )
         )
@@ -76,8 +87,12 @@ def make_pair_panel() -> ui.nav_panel:
                 12,
                 ui.card(
                     ui.h3("Pair Analysis", style="color:#00E6A8;"),
-                    ui.p("Input your stock pair and run a basic pair test.", style="color:#CCCCCC;"),
+                    ui.p(
+                        "Input your stock pair and run a basic pair test.",
+                        style="color:#CCCCCC;"
+                    ),
 
+                    # FIX: removed label_style
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
@@ -85,7 +100,6 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_action_button("run_analysis", "Run Pair Test",
                                            class_="btn btn-outline-success"),
                     ui.hr(),
-
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
                     output_widget("pair_chart")
@@ -105,12 +119,12 @@ def make_strategy_panel() -> ui.nav_panel:
                     ui.h3("Strategy Suggestions", style="color:#00E6A8;"),
                     ui.p("Configure your preferences.", style="color:#CCCCCC;"),
 
+                    # FIX: removed label_style
                     ui.input_numeric("investment_amount", "Investment Amount ($)", 10000),
                     ui.input_select("risk_level", "Risk Level", ["Low", "Medium", "High"]),
 
                     ui.input_action_button("generate_strategy", "Generate Strategy",
                                            class_="btn btn-outline-success"),
-
                     ui.hr(),
                     ui.h4("Recommended Strategy", style="color:#00E6A8;"),
                     ui.output_text_verbatim("strategy_output"),
@@ -131,15 +145,12 @@ def make_news_panel() -> ui.nav_panel:
                     ui.h3("Market News and Sentiment", style="color:#00E6A8;"),
                     ui.input_action_button("refresh_news", "Refresh News",
                                            class_="btn btn-outline-success"),
-
                     ui.hr(),
                     ui.h4("Sentiment Summary", style="color:#00E6A8;"),
                     ui.output_data_frame("sentiment_summary"),
-
                     ui.hr(),
                     ui.h4("Recent News", style="color:#00E6A8;"),
                     ui.output_data_frame("news_table"),
-
                     ui.hr(),
                     ui.h4("Sentiment Over Time", style="color:#00E6A8;"),
                     output_widget("sentiment_chart")
@@ -159,20 +170,42 @@ def make_about_panel() -> ui.nav_panel:
                     ui.h3("About HedgeHub", style="color:#00E6A8;"),
                     ui.p("Developed by Duke FinTech Students (2025).", style="color:#CCCCCC;"),
                     ui.p("Contact: jl1319@duke.edu", style="color:#CCCCCC;"),
-                    ui.p("This platform is for educational purposes only and not financial advice.",
-                         style="color:#CCCCCC;"),
+                    ui.p(
+                        "This platform is for educational purposes only and not financial advice.",
+                        style="color:#CCCCCC;"
+                    ),
                     ui.hr(),
-                    ui.p("© 2025 HedgeHub Analytics", class_="text-center", style="color:#CCCCCC;")
+                    ui.p(
+                        "© 2025 HedgeHub Analytics",
+                        class_="text-muted text-center",
+                        style="color:#CCCCCC;"
+                    )
                 )
             )
         )
     )
 
 
-# ---------------------------------------------------------
-# GLOBAL CSS + Layout
-# ---------------------------------------------------------
+# ---------- App UI ----------
+app_ui = ui.page_navbar(
+    make_home_panel(),
+    make_pair_panel(),
+    make_strategy_panel(),
+    make_news_panel(),
+    make_about_panel(),
+    title=ui.tags.div(
+        {"class": "custom-navbar"},
+        ui.tags.div(
+            {"class": "nav-left"},
+            ui.tags.span("🟢", style="font-size:1.4rem; margin-right:6px;"),
+            ui.tags.span("HedgeHub", {"class": "brand-main"})
+        )
+    )
+)
 
+
+# ---------- GLOBAL CSS ----------
+# Entire label color fix added here
 app_ui = ui.page_fillable(
     ui.tags.head(
         ui.tags.link(
@@ -180,33 +213,15 @@ app_ui = ui.page_fillable(
             rel="stylesheet"
         ),
 
-        # -------- CSS FIXES HERE --------
         ui.tags.style("""
-
-            /* ------ Fix all input labels ------ */
             label {
                 color: #CCCCCC !important;
+                font-weight: 500;
             }
 
-            /* ------ Fix strategy output text ------ */
-            #strategy_output, .shiny-output-text-verbatim {
-                color: #CCCCCC !important;
-            }
-
-            /* ------ Fix all table cells ------ */
-            table, th, td, .dataframe, .dataframe th, .dataframe td {
-                color: #CCCCCC !important;
-                background: transparent !important;
-            }
-
-            tbody tr td {
-                color: #CCCCCC !important;
-            }
-
-            /* ------ Main Theme ------ */
             body {
                 background: linear-gradient(180deg, #0F1A1A 0%, #062E2E 60%, #0F1A1A 100%);
-                color: #CCCCCC;
+                color: #E0E0E0;
                 font-family: 'Inter', sans-serif;
             }
 
@@ -217,7 +232,6 @@ app_ui = ui.page_fillable(
             }
 
             .nav-left { display: flex; align-items: center; gap: 8px; }
-
             .brand-main {
                 font-family: 'Poppins', sans-serif;
                 font-weight: 600;
@@ -238,39 +252,20 @@ app_ui = ui.page_fillable(
 
             h1, h3, h4 { color:#00E6A8; }
             p { color:#CCCCCC !important; }
-
         """)
     ),
-
-    ui.page_navbar(
-        make_home_panel(),
-        make_pair_panel(),
-        make_strategy_panel(),
-        make_news_panel(),
-        make_about_panel(),
-
-        title=ui.tags.div(
-            {"class": "custom-navbar"},
-            ui.tags.div(
-                {"class": "nav-left"},
-                ui.tags.span("🟢", style="font-size:1.4rem; margin-right:6px;"),
-                ui.tags.span("HedgeHub", {"class": "brand-main"})
-            )
-        )
-    )
+    app_ui
 )
 
 
-# ---------------------------------------------------------
-# SERVER
-# ---------------------------------------------------------
-
+# ---------- SERVER ----------
 def server(input, output, session):
 
-    # ----- Pair analysis -----
+    # Pair Analysis
     @render.text
     @reactive.event(input.run_analysis)
     def pair_test_result():
+
         ticker_a = input.stock_a()
         ticker_b = input.stock_b()
         date_range = input.date_range()
@@ -296,6 +291,7 @@ def server(input, output, session):
     @render_widget
     @reactive.event(input.run_analysis)
     def pair_chart():
+
         ticker_a = input.stock_a()
         ticker_b = input.stock_b()
         date_range = input.date_range()
@@ -318,17 +314,9 @@ def server(input, output, session):
                 "spread": result.spread_series.values
             })
 
-            fig = px.line(df, x="date", y="spread")
+            fig = px.line(df, x="date", y="spread", template="plotly_dark")
             fig.update_traces(line_color="#00E6A8")
-
-            fig.update_layout(
-                plot_bgcolor="#0F1A1A",
-                paper_bgcolor="#0F1A1A",
-                font_color="#CCCCCC"
-            )
-
-            fig.update_xaxes(showgrid=False, zeroline=False)
-            fig.update_yaxes(showgrid=False, zeroline=False)
+            fig.update_layout(title="Spread Over Time")
 
             return fig
 
@@ -336,7 +324,7 @@ def server(input, output, session):
             return px.line()
 
 
-    # ----- Strategy panel -----
+    # Strategy panel
     @render.text
     def strategy_output():
         amt = input.investment_amount()
@@ -347,23 +335,12 @@ def server(input, output, session):
     @render_widget
     def strategy_chart():
         df = pd.DataFrame({"day":[1,2,3,4], "balance":[100,102,104,103]})
-
-        fig = px.line(df, x="day", y="balance")
+        fig = px.line(df, x="day", y="balance", template="plotly_dark")
         fig.update_traces(line_color="#00E6A8")
-
-        fig.update_layout(
-            plot_bgcolor="#0F1A1A",
-            paper_bgcolor="#0F1A1A",
-            font_color="#CCCCCC"
-        )
-
-        fig.update_xaxes(showgrid=False, zeroline=False)
-        fig.update_yaxes(showgrid=False, zeroline=False)
-
         return fig
 
 
-    # ----- News table -----
+    # News panel
     @render.data_frame
     def news_table():
         data = [
@@ -373,42 +350,24 @@ def server(input, output, session):
         return pd.DataFrame(data)
 
 
-    # ----- Sentiment summary -----
     @render.data_frame
     def sentiment_summary():
         return pd.DataFrame({"Positive":[60], "Neutral":[30], "Negative":[10]})
 
 
-    # ----- Sentiment Over Time chart -----
     @render_widget
     def sentiment_chart():
         df = pd.DataFrame({
-            "date": ["2025-11-12", "2025-11-13", "2025-11-14"],
-            "Positive": [5, 7, 6],
-            "Negative": [2, 3, 1]
+            "date":["2025-11-12", "2025-11-13", "2025-11-14"],
+            "Positive":[5,7,6],
+            "Negative":[2,3,1]
         })
-
-        fig = px.line(df, x="date", y=["Positive", "Negative"])
+        fig = px.line(df, x="date", y=["Positive","Negative"], template="plotly_dark")
         fig.update_traces(line_color="#00E6A8")
-
-        fig.update_layout(
-            plot_bgcolor="#0F1A1A",
-            paper_bgcolor="#0F1A1A",
-            font_color="#CCCCCC",
-            title_font_color="#00E6A8",
-            legend_font_color="#CCCCCC"
-        )
-
-        fig.update_xaxes(showgrid=False, zeroline=False)
-        fig.update_yaxes(showgrid=False, zeroline=False)
-
         return fig
 
 
-# ---------------------------------------------------------
-# RUN APP
-# ---------------------------------------------------------
-
+# ---------- RUN ----------
 app = App(app_ui, server)
 
 if __name__ == "__main__":
