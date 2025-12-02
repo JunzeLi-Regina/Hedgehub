@@ -192,6 +192,13 @@ app_ui = ui.page_fillable(
             #strategy_output, .shiny-output-text-verbatim {
                 color: #CCCCCC !important;
             }
+            
+            /* ------ Pair Analysis result text: make it white ------ */
+            #pair_test_result {
+                color: #FFFFFF !important;
+                background-color: transparent;
+                border: none;
+            }
 
             /* ------ Fix all table cells ------ */
             table, th, td, .dataframe, .dataframe th, .dataframe td {

@@ -20,7 +20,14 @@ class PairResult:
 
 
 def download_prices(ticker: str, start: str, end: str) -> pd.Series:
-    data = yf.download(ticker, start=start, end=end, progress=False)
+    data = yf.download(
+    ticker,
+    start=start,
+    end=end,
+    progress=False,
+    auto_adjust=False
+)
+
     if "Adj Close" not in data.columns:
         raise ValueError(f"{ticker} downloaded no Adj Close data")
     return data["Adj Close"].dropna()
