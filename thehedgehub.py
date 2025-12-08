@@ -6,6 +6,7 @@ import plotly.express as px
 # Backend logic
 from strategy_engine import analyze_pair
 
+NAVBAR_ID = "main_nav"
 
 # ---------------------------------------------------------
 # UI PANELS
@@ -263,7 +264,8 @@ app_ui = ui.page_fillable(
                 ui.tags.span("🟢", style="font-size:1.4rem; margin-right:6px;"),
                 ui.tags.span("HedgeHub", {"class": "brand-main"})
             )
-        )
+        ),
+        id=NAVBAR_ID,
     )
 )
 
@@ -273,6 +275,23 @@ app_ui = ui.page_fillable(
 # ---------------------------------------------------------
 
 def server(input, output, session):
+
+    news_refresh_token = reactive.Value(0)
+
+    # ----- Navbar interactions -----
+    @reactive.effect
+    @reactive.event(input.go_to_analysis)
+    def _handle_home_cta():
+        ui.update_navs(
+            id=NAVBAR_ID,
+            selected="Pair Analysis",
+            session=session,
+        )
+
+    @reactive.effect
+    @reactive.event(input.refresh_news)
+    def _handle_news_refresh():
+        news_refresh_token.set(news_refresh_token.get() + 1)
 
     # ----- Pair analysis -----
     @render.text
@@ -373,26 +392,63 @@ def server(input, output, session):
     # ----- News table -----
     @render.data_frame
     def news_table():
+        refresh_count = news_refresh_token.get()
+        timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
         data = [
-            {"headline": "Apple releases new product", "source": "Bloomberg", "sentiment": "Positive"},
-            {"headline": "Microsoft announces AI upgrade", "source": "Reuters", "sentiment": "Neutral"}
+            {
+                "headline": "Apple releases new product",
+                "source": "Bloomberg",
+                "sentiment": "Positive",
+            },
+            {
+                "headline": "Microsoft announces AI upgrade",
+                "source": "Reuters",
+                "sentiment": "Neutral",
+            },
+            {
+                "headline": f"Market snapshot refreshed #{refresh_count}",
+                "source": "HedgeHub",
+                "sentiment": "Info",
+            },
         ]
-        return pd.DataFrame(data)
+
+        df = pd.DataFrame(data)
+        df["refreshed_at"] = timestamp
+        return df
 
 
     # ----- Sentiment summary -----
     @render.data_frame
     def sentiment_summary():
-        return pd.DataFrame({"Positive":[60], "Neutral":[30], "Negative":[10]})
+        refresh_count = news_refresh_token.get()
+        timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        rotation = (refresh_count % 4) * 2
+        df = pd.DataFrame(
+            {
+                "Positive": [60 + rotation],
+                "Neutral": [30 - rotation],
+                "Negative": [10 + max(0, rotation - 5)],
+            }
+        )
+        df["last_updated"] = timestamp
+        return df
 
 
     # ----- Sentiment Over Time chart -----
     @render_widget
     def sentiment_chart():
+        refresh_count = news_refresh_token.get()
+        offset = refresh_count % 3
         df = pd.DataFrame({
             "date": ["2025-11-12", "2025-11-13", "2025-11-14"],
-            "Positive": [5, 7, 6],
-            "Negative": [2, 3, 1]
+            "Positive": [5 + offset, 7 + offset, 6 + offset],
+            "Negative": [
+                max(1, 2 - offset),
+                max(1, 3 - offset),
+                max(1, 1 - offset)
+            ]
         })
 
         fig = px.line(df, x="date", y=["Positive", "Negative"])
