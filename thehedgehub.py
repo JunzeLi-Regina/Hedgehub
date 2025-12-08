@@ -82,6 +82,55 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
+                    ui.layout_columns(
+                        ui.column(
+                            4,
+                            ui.input_numeric(
+                                "initial_capital",
+                                "Initial Capital ($)",
+                                100000,
+                                min=1000,
+                                step=1000,
+                            ),
+                            ui.input_numeric(
+                                "shares_per_trade",
+                                "Shares per Trade",
+                                50,
+                                min=1,
+                                step=1,
+                            ),
+                        ),
+                        ui.column(
+                            4,
+                            ui.input_slider(
+                                "entry_threshold",
+                                "Entry Z-Score",
+                                min=1.0,
+                                max=3.0,
+                                value=2.0,
+                                step=0.1,
+                            ),
+                            ui.input_slider(
+                                "exit_threshold",
+                                "Exit Z-Score",
+                                min=0.1,
+                                max=1.5,
+                                value=0.5,
+                                step=0.1,
+                            ),
+                        ),
+                        ui.column(
+                            4,
+                            ui.input_slider(
+                                "stop_loss_pct",
+                                "Stop Loss (%)",
+                                min=1,
+                                max=10,
+                                value=5,
+                                step=1,
+                            ),
+                        ),
+                    ),
 
                     ui.input_action_button("run_analysis", "Run Pair Test",
                                            class_="btn btn-outline-success"),
@@ -89,7 +138,20 @@ def make_pair_panel() -> ui.nav_panel:
 
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart")
+                    ui.output_text_verbatim("pair_summary"),
+                    ui.hr(),
+                    ui.h5("Performance Metrics", style="color:#00E6A8;"),
+                    ui.output_data_frame("performance_table"),
+                    ui.layout_columns(
+                        ui.column(6, output_widget("pair_chart")),
+                        ui.column(6, output_widget("equity_chart")),
+                    ),
+                    ui.hr(),
+                    ui.h5("Trade Blotter", style="color:#00E6A8;"),
+                    ui.output_data_frame("trade_blotter_table"),
+                    ui.hr(),
+                    ui.h5("Ledger (Last 20 Rows)", style="color:#00E6A8;"),
+                    ui.output_data_frame("ledger_table")
                 )
             )
         )
@@ -277,6 +339,8 @@ app_ui = ui.page_fillable(
 def server(input, output, session):
 
     news_refresh_token = reactive.Value(0)
+    pair_result = reactive.Value(None)
+    pair_error = reactive.Value(None)
 
     # ----- Navbar interactions -----
     @reactive.effect
@@ -293,73 +357,203 @@ def server(input, output, session):
     def _handle_news_refresh():
         news_refresh_token.set(news_refresh_token.get() + 1)
 
-    # ----- Pair analysis -----
-    @render.text
+    @reactive.effect
     @reactive.event(input.run_analysis)
-    def pair_test_result():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
+    def _run_pair_analysis():
+        ticker_a = (input.stock_a() or "").strip().upper()
+        ticker_b = (input.stock_b() or "").strip().upper()
         date_range = input.date_range()
 
-        if not ticker_a or not ticker_b or not date_range:
-            return "Please enter stock tickers and date range."
+        if (
+            not ticker_a
+            or not ticker_b
+            or not date_range
+            or any(d is None for d in date_range)
+        ):
+            pair_error.set("Please enter stock tickers and date range.")
+            pair_result.set(None)
+            return
 
         start, end = date_range
+        entry_z = float(input.entry_threshold())
+        exit_z = float(input.exit_threshold())
+        initial_capital = float(input.initial_capital())
+        shares = int(input.shares_per_trade())
+        stop_loss = float(input.stop_loss_pct()) / 100.0
 
         try:
             result = analyze_pair(
                 ticker_a=ticker_a,
                 ticker_b=ticker_b,
                 start=str(start),
-                end=str(end)
+                end=str(end),
+                entry_z=entry_z,
+                exit_z=exit_z,
+                initial_capital=initial_capital,
+                shares_per_trade=shares,
+                stop_loss_pct=stop_loss,
             )
-        except Exception as e:
-            return f"Error: {e}"
+        except Exception as exc:
+            pair_error.set(str(exc))
+            pair_result.set(None)
+        else:
+            pair_result.set(result)
+            pair_error.set(None)
+
+    # ----- Pair analysis -----
+    @render.text
+    def pair_test_result():
+        error_msg = pair_error.get()
+        if error_msg:
+            return f"Error: {error_msg}"
+
+        result = pair_result.get()
+        if result is None:
+            return "Please enter stock tickers, date range, and parameters to run the analysis."
 
         return result.explanation
 
+    @render.text
+    def pair_summary():
+        if pair_error.get():
+            return ""
+
+        result = pair_result.get()
+        if result is None:
+            return "Summary will appear after a successful analysis run."
+
+        return result.summary
+
 
     @render_widget
-    @reactive.event(input.run_analysis)
     def pair_chart():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
-        date_range = input.date_range()
+        result = pair_result.get()
 
-        if not ticker_a or not ticker_b or not date_range:
-            return px.line()
+        if result is None:
+            return px.line(title="Spread Series")
 
-        start, end = date_range
-
-        try:
-            result = analyze_pair(
-                ticker_a=ticker_a,
-                ticker_b=ticker_b,
-                start=str(start),
-                end=str(end)
-            )
-
-            df = pd.DataFrame({
+        df = pd.DataFrame(
+            {
                 "date": result.spread_series.index,
-                "spread": result.spread_series.values
-            })
+                "spread": result.spread_series.values,
+            }
+        )
 
-            fig = px.line(df, x="date", y="spread")
-            fig.update_traces(line_color="#00E6A8")
+        fig = px.line(df, x="date", y="spread", title="Spread vs. Entry Bands")
+        fig.update_traces(line_color="#00E6A8")
 
-            fig.update_layout(
-                plot_bgcolor="#0F1A1A",
-                paper_bgcolor="#0F1A1A",
-                font_color="#CCCCCC"
+        mean_spread = result.spread_series.mean()
+        std_spread = result.spread_series.std(ddof=1)
+        fig.add_hline(
+            y=mean_spread,
+            line_color="#FFFFFF",
+            line_dash="dash",
+            annotation_text="Mean",
+        )
+        if std_spread > 0:
+            upper_entry = mean_spread + result.entry_z * std_spread
+            lower_entry = mean_spread - result.entry_z * std_spread
+            upper_exit = mean_spread + result.exit_z * std_spread
+            lower_exit = mean_spread - result.exit_z * std_spread
+            fig.add_hline(
+                y=upper_entry,
+                line_color="#FF6B6B",
+                line_dash="dot",
+                annotation_text="+Entry",
+            )
+            fig.add_hline(
+                y=lower_entry,
+                line_color="#FF6B6B",
+                line_dash="dot",
+                annotation_text="-Entry",
+            )
+            fig.add_hline(
+                y=upper_exit,
+                line_color="#FFA500",
+                line_dash="dot",
+                annotation_text="+Exit",
+            )
+            fig.add_hline(
+                y=lower_exit,
+                line_color="#FFA500",
+                line_dash="dot",
+                annotation_text="-Exit",
             )
 
-            fig.update_xaxes(showgrid=False, zeroline=False)
-            fig.update_yaxes(showgrid=False, zeroline=False)
+        fig.update_layout(
+            plot_bgcolor="#0F1A1A",
+            paper_bgcolor="#0F1A1A",
+            font_color="#CCCCCC",
+        )
 
-            return fig
+        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_yaxes(showgrid=False, zeroline=False)
 
-        except Exception:
-            return px.line()
+        return fig
+
+    @render_widget
+    def equity_chart():
+        result = pair_result.get()
+
+        if result is None or result.ledger.empty:
+            return px.line(title="Equity Curve")
+
+        ledger_df = result.ledger.copy()
+        ledger_df["Date"] = pd.to_datetime(ledger_df["Date"])
+
+        fig = px.line(
+            ledger_df,
+            x="Date",
+            y="Equity",
+            title="Equity Curve",
+        )
+        fig.update_traces(line_color="#00E6A8")
+        fig.update_layout(
+            plot_bgcolor="#0F1A1A",
+            paper_bgcolor="#0F1A1A",
+            font_color="#CCCCCC",
+        )
+        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_yaxes(showgrid=False, zeroline=False)
+        return fig
+
+    @render.data_frame
+    def performance_table():
+        result = pair_result.get()
+        if result is None:
+            return pd.DataFrame(columns=["Metric", "Value"])
+
+        perf_df = (
+            pd.Series(result.performance)
+            .reset_index()
+            .rename(columns={"index": "Metric", 0: "Value"})
+        )
+        return perf_df
+
+    @render.data_frame
+    def trade_blotter_table():
+        result = pair_result.get()
+        if result is None or result.blotter.empty:
+            return pd.DataFrame({"Info": ["No trades executed in sample."]})
+
+        blotter_df = result.blotter.copy()
+        blotter_df["Entry Date"] = pd.to_datetime(blotter_df["Entry Date"]).dt.strftime(
+            "%Y-%m-%d"
+        )
+        blotter_df["Exit Date"] = pd.to_datetime(blotter_df["Exit Date"]).dt.strftime(
+            "%Y-%m-%d"
+        )
+        return blotter_df
+
+    @render.data_frame
+    def ledger_table():
+        result = pair_result.get()
+        if result is None or result.ledger.empty:
+            return pd.DataFrame(columns=["Date", "Position", "Equity"])
+
+        ledger_df = result.ledger.copy().tail(20)
+        ledger_df["Date"] = pd.to_datetime(ledger_df["Date"]).dt.strftime("%Y-%m-%d")
+        return ledger_df
 
 
     # ----- Strategy panel -----
