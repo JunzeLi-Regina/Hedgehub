@@ -1,7 +1,11 @@
+import os
+
 from shiny import App, ui, render, reactive
 from shinywidgets import output_widget, render_widget
 import pandas as pd
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Backend logic
 from strategy_engine import analyze_pair
@@ -82,6 +86,12 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
+                    ui.input_text(
+                        "tiingo_api_key",
+                        "Tiingo API Key",
+                        value="",
+                        placeholder="Enter Tiingo API key",
+                    ),
                     ui.layout_columns(
                         ui.column(
                             4,
@@ -380,6 +390,9 @@ def server(input, output, session):
         initial_capital = float(input.initial_capital())
         shares = int(input.shares_per_trade())
         stop_loss = float(input.stop_loss_pct()) / 100.0
+        tiingo_key = (input.tiingo_api_key() or "").strip()
+        if not tiingo_key:
+            tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
 
         try:
             result = analyze_pair(
@@ -392,6 +405,7 @@ def server(input, output, session):
                 initial_capital=initial_capital,
                 shares_per_trade=shares,
                 stop_loss_pct=stop_loss,
+                tiingo_api_key=tiingo_key or None,
             )
         except Exception as exc:
             pair_error.set(str(exc))
@@ -422,73 +436,84 @@ def server(input, output, session):
         if result is None:
             return "Summary will appear after a successful analysis run."
 
-        return result.summary
+        stats = result.stats
+        half_life = stats.get("half_life", np.inf)
+        diagnostics = [
+            f"Correlation: {stats['correlation']:.2f}",
+            f"Cointegration p-value: {stats['coint_pvalue']:.4f}",
+            f"ADF p-value: {stats['adf_pvalue']:.4f}",
+            "Half-life: "
+            + ("∞" if not np.isfinite(half_life) else f"{half_life:.1f} days"),
+        ]
+
+        return f"{result.summary}\n\nDiagnostics:\n" + "\n".join(diagnostics)
 
 
     @render_widget
     def pair_chart():
         result = pair_result.get()
 
-        if result is None:
-            return px.line(title="Spread Series")
+        if result is None or result.zscore_series.empty:
+            return go.Figure(layout=dict(title="Z-Score vs Dynamic Thresholds"))
 
+        z = result.zscore_series
+        thresholds = result.threshold_series.reindex(z.index).fillna(method="ffill")
         df = pd.DataFrame(
             {
-                "date": result.spread_series.index,
-                "spread": result.spread_series.values,
+                "date": z.index,
+                "Z-Score": z.values,
+                "Upper Threshold": thresholds.values,
+                "Lower Threshold": -thresholds.values,
             }
         )
 
-        fig = px.line(df, x="date", y="spread", title="Spread vs. Entry Bands")
-        fig.update_traces(line_color="#00E6A8")
-
-        mean_spread = result.spread_series.mean()
-        std_spread = result.spread_series.std(ddof=1)
-        fig.add_hline(
-            y=mean_spread,
-            line_color="#FFFFFF",
-            line_dash="dash",
-            annotation_text="Mean",
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=df["date"],
+                y=df["Z-Score"],
+                name="Z-Score",
+                line=dict(color="#00E6A8", width=2),
+            )
         )
-        if std_spread > 0:
-            upper_entry = mean_spread + result.entry_z * std_spread
-            lower_entry = mean_spread - result.entry_z * std_spread
-            upper_exit = mean_spread + result.exit_z * std_spread
-            lower_exit = mean_spread - result.exit_z * std_spread
-            fig.add_hline(
-                y=upper_entry,
-                line_color="#FF6B6B",
-                line_dash="dot",
-                annotation_text="+Entry",
+        fig.add_trace(
+            go.Scatter(
+                x=df["date"],
+                y=df["Upper Threshold"],
+                name="+Entry Band",
+                line=dict(color="#FF6B6B", dash="dot"),
             )
-            fig.add_hline(
-                y=lower_entry,
-                line_color="#FF6B6B",
-                line_dash="dot",
-                annotation_text="-Entry",
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df["date"],
+                y=df["Lower Threshold"],
+                name="-Entry Band",
+                line=dict(color="#FF6B6B", dash="dot"),
+                showlegend=True,
             )
-            fig.add_hline(
-                y=upper_exit,
-                line_color="#FFA500",
-                line_dash="dot",
-                annotation_text="+Exit",
-            )
-            fig.add_hline(
-                y=lower_exit,
-                line_color="#FFA500",
-                line_dash="dot",
-                annotation_text="-Exit",
-            )
+        )
+        fig.add_hline(
+            y=result.exit_z,
+            line_color="#FFA500",
+            line_dash="dash",
+            annotation_text="+Exit Band",
+        )
+        fig.add_hline(
+            y=-result.exit_z,
+            line_color="#FFA500",
+            line_dash="dash",
+            annotation_text="-Exit Band",
+        )
 
         fig.update_layout(
+            title="Z-Score vs Dynamic Entry/Exit Bands",
             plot_bgcolor="#0F1A1A",
             paper_bgcolor="#0F1A1A",
             font_color="#CCCCCC",
         )
-
         fig.update_xaxes(showgrid=False, zeroline=False)
         fig.update_yaxes(showgrid=False, zeroline=False)
-
         return fig
 
     @render_widget
@@ -523,12 +548,24 @@ def server(input, output, session):
         if result is None:
             return pd.DataFrame(columns=["Metric", "Value"])
 
-        perf_df = (
-            pd.Series(result.performance)
-            .reset_index()
-            .rename(columns={"index": "Metric", 0: "Value"})
+        perf = result.performance
+        metrics = {
+            "Initial Capital": f"${result.initial_capital:,.0f}",
+            "Final Equity": f"${perf['Final Equity ($)']:,.0f}",
+            "Total Return": f"{perf['Total Return (%)']:.2f}%",
+            "Annualized Return": f"{perf['Annualized Return (%)']:.2f}%",
+            "Annualized Volatility": f"{perf['Annualized Volatility (%)']:.2f}%",
+            "Sharpe Ratio": f"{perf['Sharpe Ratio']:.2f}",
+            "Max Drawdown": f"{perf['Max Drawdown (%)']:.2f}%",
+            "Trades": perf["Trades"],
+            "Win Rate": f"{perf['Win Rate (%)']:.2f}%",
+            "Stop-outs": perf["Stop-outs"],
+            "Best Trade": f"${perf['Best Trade ($)']:,.2f}",
+            "Worst Trade": f"${perf['Worst Trade ($)']:,.2f}",
+        }
+        return pd.DataFrame(
+            {"Metric": list(metrics.keys()), "Value": list(metrics.values())}
         )
-        return perf_df
 
     @render.data_frame
     def trade_blotter_table():
@@ -543,6 +580,9 @@ def server(input, output, session):
         blotter_df["Exit Date"] = pd.to_datetime(blotter_df["Exit Date"]).dt.strftime(
             "%Y-%m-%d"
         )
+        numeric_cols = ["PnL A ($)", "PnL B ($)", "PnL ($)"]
+        for col in numeric_cols:
+            blotter_df[col] = blotter_df[col].map(lambda v: f"${v:,.2f}")
         return blotter_df
 
     @render.data_frame
@@ -553,6 +593,8 @@ def server(input, output, session):
 
         ledger_df = result.ledger.copy().tail(20)
         ledger_df["Date"] = pd.to_datetime(ledger_df["Date"]).dt.strftime("%Y-%m-%d")
+        ledger_df["Cash"] = ledger_df["Cash"].map(lambda v: f"${v:,.0f}")
+        ledger_df["Equity"] = ledger_df["Equity"].map(lambda v: f"${v:,.0f}")
         return ledger_df
 
 
