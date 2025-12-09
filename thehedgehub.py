@@ -115,7 +115,14 @@ def make_pair_panel() -> ui.nav_panel:
 
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart")
+                    output_widget("pair_chart"),
+                    ui.hr(),
+                    ui.h4("Performance Metrics", style="color:#00E6A8;"),
+                    ui.p(
+                        "These placeholders summarize key portfolio stats for the selected pair. The table will refresh once you run a new analysis.",
+                        style="color:#CCCCCC;"
+                    ),
+                    ui.output_data_frame("performance_metrics")
                 )
             )
         )
@@ -386,6 +393,26 @@ def server(input, output, session):
 
         except Exception:
             return px.line()
+
+
+    @render.data_frame
+    @reactive.event(input.run_analysis)
+    def performance_metrics():
+        ticker_a = input.stock_a() or "Stock A"
+        ticker_b = input.stock_b() or "Stock B"
+
+        data = [
+            {"Metric": "Initial Capital", "Value": "$1,000,000", "Notes": "Placeholder amount"},
+            {"Metric": "Final Value", "Value": "$1,000,000", "Notes": "Pending calculation"},
+            {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Sharpe Ratio", "Value": "0.00", "Notes": "Calculated after live backtest"},
+            {"Metric": "Max Drawdown", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Total Trades", "Value": "0", "Notes": f"Waiting for trades from {ticker_a}/{ticker_b}"},
+        ]
+
+        return pd.DataFrame(data)
 
 
     # ----- Strategy panel -----
