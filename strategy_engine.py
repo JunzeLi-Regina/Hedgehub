@@ -1,8 +1,24 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+import math
+
 import pandas as pd
 import yfinance as yf
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller
+
+
+@dataclass
+class PerformanceMetrics:
+    initial_capital: float
+    final_value: float
+    total_return: float
+    annualized_return: float
+    annualized_volatility: float
+    sharpe_ratio: float
+    max_drawdown: float
+    total_trades: int
 
 
 @dataclass
@@ -16,6 +32,112 @@ class PairResult:
     last_spread: float
     last_zscore: float
     spread_series: pd.Series
+    prices: pd.DataFrame | None = None
+    spread_zscores: pd.Series | None = None
+    performance: PerformanceMetrics | None = None
+    entry_z: float | None = None
+    exit_z: float | None = None
+
+
+def run_mean_reversion_backtest(
+    price_frame: pd.DataFrame,
+    beta: float,
+    zscores: pd.Series,
+    entry_z: float,
+    exit_z: float,
+    initial_capital: float = 1_000_000.0,
+    allocation: float = 0.5,
+) -> PerformanceMetrics:
+    """
+    Simple mean-reversion backtest based on z-score thresholds.
+    """
+    rows = price_frame.shape[0]
+    if rows < 2 or zscores.empty:
+        return PerformanceMetrics(
+            initial_capital=initial_capital,
+            final_value=initial_capital,
+            total_return=0.0,
+            annualized_return=0.0,
+            annualized_volatility=0.0,
+            sharpe_ratio=0.0,
+            max_drawdown=0.0,
+            total_trades=0,
+        )
+
+    allocation = max(0.0, min(1.0, allocation))
+    exposure_scale = max(1.0, 1.0 + abs(beta))
+
+    returns_a = price_frame["A"].pct_change().fillna(0.0)
+    returns_b = price_frame["B"].pct_change().fillna(0.0)
+
+    position = 0.0
+    capital = initial_capital
+    equity_curve = [capital]
+    daily_returns: list[float] = []
+    trades = 0
+
+    for idx in range(1, rows):
+        z = float(zscores.iloc[idx - 1])
+
+        if position != 0.0 and abs(z) <= exit_z:
+            position = 0.0
+
+        if position == 0.0:
+            if z > entry_z:
+                position = -allocation
+                trades += 1
+            elif z < -entry_z:
+                position = allocation
+                trades += 1
+
+        spread_return = (returns_a.iloc[idx] - beta * returns_b.iloc[idx]) / exposure_scale
+        day_return = position * spread_return
+        daily_returns.append(day_return)
+        capital *= (1 + day_return)
+        equity_curve.append(capital)
+
+    if not daily_returns:
+        return PerformanceMetrics(
+            initial_capital=initial_capital,
+            final_value=initial_capital,
+            total_return=0.0,
+            annualized_return=0.0,
+            annualized_volatility=0.0,
+            sharpe_ratio=0.0,
+            max_drawdown=0.0,
+            total_trades=0,
+        )
+
+    equity_series = pd.Series(equity_curve, index=price_frame.index)
+    daily_series = pd.Series(daily_returns, index=price_frame.index[1:])
+
+    total_return = float(capital / initial_capital - 1.0)
+
+    num_periods = len(daily_returns)
+    growth_factor = 1.0 + total_return
+    if num_periods > 0 and growth_factor > 0:
+        annualized_return = growth_factor ** (252 / num_periods) - 1.0
+    else:
+        annualized_return = 0.0
+
+    daily_vol = float(daily_series.std(ddof=1)) if num_periods > 1 else 0.0
+    annualized_vol = daily_vol * math.sqrt(252)
+    sharpe = annualized_return / annualized_vol if annualized_vol > 0 else 0.0
+
+    running_max = equity_series.cummax()
+    drawdowns = (equity_series / running_max) - 1.0
+    max_drawdown = float(drawdowns.min()) if not drawdowns.empty else 0.0
+
+    return PerformanceMetrics(
+        initial_capital=initial_capital,
+        final_value=capital,
+        total_return=total_return,
+        annualized_return=annualized_return,
+        annualized_volatility=annualized_vol,
+        sharpe_ratio=sharpe,
+        max_drawdown=max_drawdown,
+        total_trades=trades,
+    )
 
 
 def download_prices(ticker: str, start: str, end: str) -> pd.Series:
@@ -53,6 +175,7 @@ def analyze_pair(
 
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
+    display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
     beta = estimate_hedge_ratio(df["A"], df["B"])
     spread = df["A"] - beta * df["B"]
@@ -64,6 +187,19 @@ def analyze_pair(
     std_spread = spread.std(ddof=1)
     last_spread = float(spread.iloc[-1])
     z = (last_spread - mean_spread) / std_spread if std_spread > 0 else 0.0
+
+    if std_spread > 0:
+        zscores = (spread - mean_spread) / std_spread
+    else:
+        zscores = pd.Series(0.0, index=spread.index)
+
+    performance = run_mean_reversion_backtest(
+        price_frame=df,
+        beta=beta,
+        zscores=zscores,
+        entry_z=entry_z,
+        exit_z=exit_z,
+    )
 
     if not pair_ok:
         explanation = (
@@ -82,6 +218,11 @@ def analyze_pair(
             last_spread=last_spread,
             last_zscore=z,
             spread_series=spread,
+            prices=display_prices,
+            spread_zscores=zscores,
+            performance=performance,
+            entry_z=entry_z,
+            exit_z=exit_z,
         )
 
     entry_upper = mean_spread + entry_z * std_spread
@@ -129,6 +270,11 @@ def analyze_pair(
         last_spread=last_spread,
         last_zscore=z,
         spread_series=spread,
+        prices=display_prices,
+        spread_zscores=zscores,
+        performance=performance,
+        entry_z=entry_z,
+        exit_z=exit_z,
     )
 
 
@@ -146,6 +292,7 @@ def analyze_pair_momentum(
 
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
+    display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
     ratio = df["A"] / df["B"]
 
@@ -186,4 +333,9 @@ def analyze_pair_momentum(
         last_spread=cur,
         last_zscore=0.0,
         spread_series=ratio,
+        prices=display_prices,
+        spread_zscores=None,
+        performance=None,
+        entry_z=None,
+        exit_z=None,
     )

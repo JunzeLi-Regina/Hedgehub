@@ -8,6 +8,15 @@ from strategy_engine import analyze_pair
 
 NAVBAR_ID = "main_nav"
 
+
+def format_currency(value: float) -> str:
+    return f"${value:,.2f}"
+
+
+def format_percentage(value: float) -> str:
+    return f"{value * 100:.2f}%"
+
+
 # ---------------------------------------------------------
 # UI PANELS
 # ---------------------------------------------------------
@@ -108,6 +117,20 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
+                    ui.input_numeric(
+                        "initial_capital",
+                        "Initial Capital ($)",
+                        1_000_000,
+                        min=10_000,
+                        step=10_000,
+                    ),
+                    ui.input_numeric(
+                        "shares_per_trade",
+                        "Shares per Trade",
+                        100,
+                        min=1,
+                        step=10,
+                    ),
 
                     ui.input_action_button("run_analysis", "Run Pair Test",
                                            class_="btn btn-outline-success"),
@@ -115,14 +138,42 @@ def make_pair_panel() -> ui.nav_panel:
 
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart"),
                     ui.hr(),
                     ui.h4("Performance Metrics", style="color:#00E6A8;"),
                     ui.p(
-                        "These placeholders summarize key portfolio stats for the selected pair. The table will refresh once you run a new analysis.",
+                        "These metrics summarize key portfolio stats for the selected pair. The table refreshes after each analysis.",
                         style="color:#CCCCCC;"
                     ),
-                    ui.output_data_frame("performance_metrics")
+                    ui.output_data_frame("performance_metrics"),
+                    ui.hr(),
+                    ui.h4("Visualizations", style="color:#00E6A8;"),
+                    ui.p(
+                        "Explore the price trend of each stock, the long spread between the pair, and the standardized Z-score signal.",
+                        style="color:#CCCCCC;"
+                    ),
+                    ui.layout_columns(
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Price Trend", style="color:#00E6A8;"),
+                                output_widget("price_trend_chart"),
+                            ),
+                        ),
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Long Spread", style="color:#00E6A8;"),
+                                output_widget("spread_chart"),
+                            ),
+                        ),
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Z-Score", style="color:#00E6A8;"),
+                                output_widget("zscore_chart"),
+                            ),
+                        ),
+                    ),
                 )
             )
         )
@@ -310,6 +361,10 @@ app_ui = ui.page_fillable(
 def server(input, output, session):
 
     news_refresh_token = reactive.Value(0)
+    analysis_result = reactive.Value(None)
+    analysis_error = reactive.Value(
+        "Enter stock tickers and a date range, then click Run Pair Test."
+    )
 
     # ----- Navbar interactions -----
     @reactive.effect
@@ -326,93 +381,217 @@ def server(input, output, session):
     def _handle_news_refresh():
         news_refresh_token.set(news_refresh_token.get() + 1)
 
+    @reactive.effect
+    @reactive.event(input.run_analysis)
+    def _run_pair_analysis():
+        ticker_a = (input.stock_a() or "").strip().upper()
+        ticker_b = (input.stock_b() or "").strip().upper()
+        date_range = input.date_range()
+
+        if not ticker_a or not ticker_b or not date_range:
+            analysis_result.set(None)
+            analysis_error.set("Please enter both tickers and select a valid date range.")
+            return
+
+        start, end = date_range
+
+        try:
+            result = analyze_pair(
+                ticker_a=ticker_a,
+                ticker_b=ticker_b,
+                start=str(start),
+                end=str(end),
+            )
+        except Exception as err:
+            analysis_result.set(None)
+            analysis_error.set(f"Error: {err}")
+        else:
+            analysis_result.set(result)
+            analysis_error.set("")
+
     # ----- Pair analysis -----
     @render.text
-    @reactive.event(input.run_analysis)
     def pair_test_result():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
-        date_range = input.date_range()
+        result = analysis_result.get()
+        error_message = analysis_error.get()
 
-        if not ticker_a or not ticker_b or not date_range:
-            return "Please enter stock tickers and date range."
+        if result is not None:
+            return result.explanation
 
-        start, end = date_range
+        if error_message:
+            return error_message
 
-        try:
-            result = analyze_pair(
-                ticker_a=ticker_a,
-                ticker_b=ticker_b,
-                start=str(start),
-                end=str(end)
-            )
-        except Exception as e:
-            return f"Error: {e}"
-
-        return result.explanation
-
-
-    @render_widget
-    @reactive.event(input.run_analysis)
-    def pair_chart():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
-        date_range = input.date_range()
-
-        if not ticker_a or not ticker_b or not date_range:
-            return px.line()
-
-        start, end = date_range
-
-        try:
-            result = analyze_pair(
-                ticker_a=ticker_a,
-                ticker_b=ticker_b,
-                start=str(start),
-                end=str(end)
-            )
-
-            df = pd.DataFrame({
-                "date": result.spread_series.index,
-                "spread": result.spread_series.values
-            })
-
-            fig = px.line(df, x="date", y="spread")
-            fig.update_traces(line_color="#00E6A8")
-
-            fig.update_layout(
-                plot_bgcolor="#0F1A1A",
-                paper_bgcolor="#0F1A1A",
-                font_color="#CCCCCC"
-            )
-
-            fig.update_xaxes(showgrid=False, zeroline=False)
-            fig.update_yaxes(showgrid=False, zeroline=False)
-
-            return fig
-
-        except Exception:
-            return px.line()
+        return "Enter stock tickers and a date range, then click Run Pair Test."
 
 
     @render.data_frame
-    @reactive.event(input.run_analysis)
     def performance_metrics():
-        ticker_a = input.stock_a() or "Stock A"
-        ticker_b = input.stock_b() or "Stock B"
+        ticker_a = (input.stock_a() or "Stock A").upper()
+        ticker_b = (input.stock_b() or "Stock B").upper()
+        pair_label = f"{ticker_a}/{ticker_b}"
+        user_capital = float(input.initial_capital() or 1_000_000.0)
+        shares_per_trade = int(input.shares_per_trade() or 0)
+
+        result = analysis_result.get()
+        metrics = result.performance if result else None
+
+        if result is None or metrics is None:
+            waiting_note = analysis_error.get() or f"Waiting for trades from {pair_label}"
+            data = [
+                {
+                    "Metric": "Initial Capital",
+                    "Value": format_currency(user_capital),
+                    "Notes": "Configured once analysis runs",
+                },
+                {
+                    "Metric": "Shares per Trade",
+                    "Value": f"{shares_per_trade:,}",
+                    "Notes": "User-defined size per signal",
+                },
+                {
+                    "Metric": "Final Value",
+                    "Value": format_currency(user_capital),
+                    "Notes": "Pending calculation",
+                },
+                {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+                {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+                {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+                {"Metric": "Sharpe Ratio", "Value": "0.00", "Notes": "Calculated after live backtest"},
+                {"Metric": "Max Drawdown", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+                {"Metric": "Total Trades", "Value": "0", "Notes": waiting_note},
+            ]
+            return pd.DataFrame(data)
+
+        scaled_final_value = user_capital * (1 + metrics.total_return)
 
         data = [
-            {"Metric": "Initial Capital", "Value": "$1,000,000", "Notes": "Placeholder amount"},
-            {"Metric": "Final Value", "Value": "$1,000,000", "Notes": "Pending calculation"},
-            {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Sharpe Ratio", "Value": "0.00", "Notes": "Calculated after live backtest"},
-            {"Metric": "Max Drawdown", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Total Trades", "Value": "0", "Notes": f"Waiting for trades from {ticker_a}/{ticker_b}"},
+            {
+                "Metric": "Initial Capital",
+                "Value": format_currency(user_capital),
+                "Notes": "Starting notional used for backtest",
+            },
+            {
+                "Metric": "Shares per Trade",
+                "Value": f"{shares_per_trade:,}",
+                "Notes": "Size submitted on each entry signal",
+            },
+            {
+                "Metric": "Final Value",
+                "Value": format_currency(scaled_final_value),
+                "Notes": f"Strategy valuation after testing {pair_label}",
+            },
+            {
+                "Metric": "Total Return",
+                "Value": format_percentage(metrics.total_return),
+                "Notes": "Aggregate return over selected window",
+            },
+            {
+                "Metric": "Annualized Return",
+                "Value": format_percentage(metrics.annualized_return),
+                "Notes": "Compounded using daily observations",
+            },
+            {
+                "Metric": "Annualized Volatility",
+                "Value": format_percentage(metrics.annualized_volatility),
+                "Notes": "Scaled by sqrt(252) trading days",
+            },
+            {
+                "Metric": "Sharpe Ratio",
+                "Value": f"{metrics.sharpe_ratio:.2f}",
+                "Notes": "Uses annualized return and volatility",
+            },
+            {
+                "Metric": "Max Drawdown",
+                "Value": format_percentage(metrics.max_drawdown),
+                "Notes": "Worst peak-to-trough decline in equity curve",
+            },
+            {
+                "Metric": "Total Trades",
+                "Value": str(metrics.total_trades),
+                "Notes": f"Entries generated by z-score triggers for {pair_label}",
+            },
         ]
 
         return pd.DataFrame(data)
+
+
+    def _style_figure(fig):
+        fig.update_layout(
+            plot_bgcolor="#0F1A1A",
+            paper_bgcolor="#0F1A1A",
+            font_color="#CCCCCC",
+            legend_font_color="#CCCCCC",
+        )
+        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_yaxes(showgrid=False, zeroline=False)
+        return fig
+
+    def _format_date_column(df: pd.DataFrame, column: str = "date") -> pd.DataFrame:
+        df[column] = pd.to_datetime(df[column]).dt.strftime("%Y-%m")
+        return df
+
+
+    @render_widget
+    def price_trend_chart():
+        result = analysis_result.get()
+        prices = result.prices if result else None
+
+        if prices is None or prices.empty:
+            return px.line()
+
+        price_df = prices.copy().reset_index()
+        price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        price_df = _format_date_column(price_df, "date")
+        value_cols = [c for c in price_df.columns if c != "date"]
+
+        fig = px.line(
+            price_df,
+            x="date",
+            y=value_cols,
+            color_discrete_sequence=["#00E6A8", "#00A2FF"],
+        )
+        return _style_figure(fig)
+
+
+    @render_widget
+    def spread_chart():
+        result = analysis_result.get()
+
+        if result is None or result.spread_series.empty:
+            return px.line()
+
+        df = pd.DataFrame({
+            "date": result.spread_series.index,
+            "spread": result.spread_series.values
+        })
+        df = _format_date_column(df, "date")
+
+        fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
+        fig.update_traces(line_width=2)
+        return _style_figure(fig)
+
+
+    @render_widget
+    def zscore_chart():
+        result = analysis_result.get()
+        zscores = result.spread_zscores if result else None
+
+        if zscores is None or zscores.empty:
+            return px.line()
+
+        df = pd.DataFrame({
+            "date": zscores.index,
+            "zscore": zscores.values
+        })
+        df = _format_date_column(df, "date")
+
+        fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
+        fig.update_traces(line_width=2)
+        fig.add_hline(y=2, line_dash="dot", line_color="#FFB347", opacity=0.6)
+        fig.add_hline(y=-2, line_dash="dot", line_color="#FFB347", opacity=0.6)
+        fig.add_hline(y=0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        fig.add_hline(y=-0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        return _style_figure(fig)
 
 
     # ----- Strategy panel -----
