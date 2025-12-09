@@ -113,16 +113,17 @@ def make_pair_panel() -> ui.nav_panel:
                                            class_="btn btn-outline-success"),
                     ui.hr(),
 
-                    ui.h4("Results", style="color:#00E6A8;"),
-                    ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart"),
-                    ui.hr(),
                     ui.h4("Performance Metrics", style="color:#00E6A8;"),
                     ui.p(
                         "These placeholders summarize key portfolio stats for the selected pair. The table will refresh once you run a new analysis.",
                         style="color:#CCCCCC;"
                     ),
-                    ui.output_data_frame("performance_metrics")
+                    ui.output_data_frame("performance_metrics"),
+                    ui.hr(),
+
+                    ui.h4("Results", style="color:#00E6A8;"),
+                    ui.output_text_verbatim("pair_test_result"),
+                    output_widget("pair_chart"),
                 )
             )
         )
