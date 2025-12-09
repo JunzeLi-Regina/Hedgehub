@@ -155,32 +155,32 @@ def make_strategy_panel() -> ui.nav_panel:
     )
 
 
-def make_news_panel() -> ui.nav_panel:
-    return ui.nav_panel(
-        "Market News",
-        ui.layout_columns(
-            ui.column(
-                12,
-                ui.card(
-                    ui.h3("Market News and Sentiment", style="color:#00E6A8;"),
-                    ui.input_action_button("refresh_news", "Refresh News",
-                                           class_="btn btn-outline-success"),
+# def make_news_panel() -> ui.nav_panel:
+#     return ui.nav_panel(
+#         "Market News",
+#         ui.layout_columns(
+#             ui.column(
+#                 12,
+#                 ui.card(
+#                     ui.h3("Market News and Sentiment", style="color:#00E6A8;"),
+#                     ui.input_action_button("refresh_news", "Refresh News",
+#                                            class_="btn btn-outline-success"),
 
-                    ui.hr(),
-                    ui.h4("Sentiment Summary", style="color:#00E6A8;"),
-                    ui.output_data_frame("sentiment_summary"),
+#                     ui.hr(),
+#                     ui.h4("Sentiment Summary", style="color:#00E6A8;"),
+#                     ui.output_data_frame("sentiment_summary"),
 
-                    ui.hr(),
-                    ui.h4("Recent News", style="color:#00E6A8;"),
-                    ui.output_data_frame("news_table"),
+#                     ui.hr(),
+#                     ui.h4("Recent News", style="color:#00E6A8;"),
+#                     ui.output_data_frame("news_table"),
 
-                    ui.hr(),
-                    ui.h4("Sentiment Over Time", style="color:#00E6A8;"),
-                    output_widget("sentiment_chart")
-                )
-            )
-        )
-    )
+#                     ui.hr(),
+#                     ui.h4("Sentiment Over Time", style="color:#00E6A8;"),
+#                     output_widget("sentiment_chart")
+#                 )
+#             )
+#         )
+#     )
 
 
 def make_about_panel() -> ui.nav_panel:
@@ -287,7 +287,7 @@ app_ui = ui.page_fillable(
         make_home_panel(),
         make_pair_panel(),
         make_strategy_panel(),
-        make_news_panel(),
+        # make_news_panel(),
         make_about_panel(),
 
         title=ui.tags.div(
@@ -309,7 +309,7 @@ app_ui = ui.page_fillable(
 
 def server(input, output, session):
 
-    news_refresh_token = reactive.Value(0)
+    # news_refresh_token = reactive.Value(0)
 
     # ----- Navbar interactions -----
     @reactive.effect
@@ -321,10 +321,10 @@ def server(input, output, session):
             session=session,
         )
 
-    @reactive.effect
-    @reactive.event(input.refresh_news)
-    def _handle_news_refresh():
-        news_refresh_token.set(news_refresh_token.get() + 1)
+    # @reactive.effect
+    # @reactive.event(input.refresh_news)
+    # def _handle_news_refresh():
+    #     news_refresh_token.set(news_refresh_token.get() + 1)
 
     # ----- Pair analysis -----
     @render.text
@@ -442,83 +442,83 @@ def server(input, output, session):
         return fig
 
 
-    # ----- News table -----
-    @render.data_frame
-    def news_table():
-        refresh_count = news_refresh_token.get()
-        timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    # # ----- News table -----
+    # @render.data_frame
+    # def news_table():
+    #     refresh_count = news_refresh_token.get()
+    #     timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-        data = [
-            {
-                "headline": "Apple releases new product",
-                "source": "Bloomberg",
-                "sentiment": "Positive",
-            },
-            {
-                "headline": "Microsoft announces AI upgrade",
-                "source": "Reuters",
-                "sentiment": "Neutral",
-            },
-            {
-                "headline": f"Market snapshot refreshed #{refresh_count}",
-                "source": "HedgeHub",
-                "sentiment": "Info",
-            },
-        ]
+    #     data = [
+    #         {
+    #             "headline": "Apple releases new product",
+    #             "source": "Bloomberg",
+    #             "sentiment": "Positive",
+    #         },
+    #         {
+    #             "headline": "Microsoft announces AI upgrade",
+    #             "source": "Reuters",
+    #             "sentiment": "Neutral",
+    #         },
+    #         {
+    #             "headline": f"Market snapshot refreshed #{refresh_count}",
+    #             "source": "HedgeHub",
+    #             "sentiment": "Info",
+    #         },
+    #     ]
 
-        df = pd.DataFrame(data)
-        df["refreshed_at"] = timestamp
-        return df
-
-
-    # ----- Sentiment summary -----
-    @render.data_frame
-    def sentiment_summary():
-        refresh_count = news_refresh_token.get()
-        timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-
-        rotation = (refresh_count % 4) * 2
-        df = pd.DataFrame(
-            {
-                "Positive": [60 + rotation],
-                "Neutral": [30 - rotation],
-                "Negative": [10 + max(0, rotation - 5)],
-            }
-        )
-        df["last_updated"] = timestamp
-        return df
+    #     df = pd.DataFrame(data)
+    #     df["refreshed_at"] = timestamp
+    #     return df
 
 
-    # ----- Sentiment Over Time chart -----
-    @render_widget
-    def sentiment_chart():
-        refresh_count = news_refresh_token.get()
-        offset = refresh_count % 3
-        df = pd.DataFrame({
-            "date": ["2025-11-12", "2025-11-13", "2025-11-14"],
-            "Positive": [5 + offset, 7 + offset, 6 + offset],
-            "Negative": [
-                max(1, 2 - offset),
-                max(1, 3 - offset),
-                max(1, 1 - offset)
-            ]
-        })
+    # # ----- Sentiment summary -----
+    # @render.data_frame
+    # def sentiment_summary():
+    #     refresh_count = news_refresh_token.get()
+    #     timestamp = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-        fig = px.line(df, x="date", y=["Positive", "Negative"])
-        fig.update_traces(line_color="#00E6A8")
+    #     rotation = (refresh_count % 4) * 2
+    #     df = pd.DataFrame(
+    #         {
+    #             "Positive": [60 + rotation],
+    #             "Neutral": [30 - rotation],
+    #             "Negative": [10 + max(0, rotation - 5)],
+    #         }
+    #     )
+    #     df["last_updated"] = timestamp
+    #     return df
 
-        fig.update_layout(
-            plot_bgcolor="#0F1A1A",
-            paper_bgcolor="#0F1A1A",
-            font_color="#CCCCCC",
-            title_font_color="#00E6A8",
-            legend_font_color="#CCCCCC"
-        )
 
-        fig.update_xaxes(showgrid=False, zeroline=False)
-        fig.update_yaxes(showgrid=False, zeroline=False)
+    # # ----- Sentiment Over Time chart -----
+    # @render_widget
+    # def sentiment_chart():
+    #     refresh_count = news_refresh_token.get()
+    #     offset = refresh_count % 3
+    #     df = pd.DataFrame({
+    #         "date": ["2025-11-12", "2025-11-13", "2025-11-14"],
+    #         "Positive": [5 + offset, 7 + offset, 6 + offset],
+    #         "Negative": [
+    #             max(1, 2 - offset),
+    #             max(1, 3 - offset),
+    #             max(1, 1 - offset)
+    #         ]
+    #     })
 
-        return fig
+    #     fig = px.line(df, x="date", y=["Positive", "Negative"])
+    #     fig.update_traces(line_color="#00E6A8")
+
+    #     fig.update_layout(
+    #         plot_bgcolor="#0F1A1A",
+    #         paper_bgcolor="#0F1A1A",
+    #         font_color="#CCCCCC",
+    #         title_font_color="#00E6A8",
+    #         legend_font_color="#CCCCCC"
+    #     )
+
+    #     fig.update_xaxes(showgrid=False, zeroline=False)
+    #     fig.update_yaxes(showgrid=False, zeroline=False)
+
+    #     return fig
 
 
 # ---------------------------------------------------------
