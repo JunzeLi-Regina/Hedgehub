@@ -372,7 +372,7 @@ def server(input, output, session):
                 [{"Metric": "Status", "Value": error or "Unavailable", "Notes": "Unable to compute metrics"}]
             )
 
-        perf = result.performance or {}
+        perf = getattr(result, "performance", None) or {}
 
         def fmt_currency(value):
             if value is None:
