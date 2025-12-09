@@ -32,7 +32,11 @@ class PairResult:
     last_spread: float
     last_zscore: float
     spread_series: pd.Series
+    prices: pd.DataFrame | None = None
+    spread_zscores: pd.Series | None = None
     performance: PerformanceMetrics | None = None
+    entry_z: float | None = None
+    exit_z: float | None = None
 
 
 def run_mean_reversion_backtest(
@@ -171,6 +175,7 @@ def analyze_pair(
 
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
+    display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
     beta = estimate_hedge_ratio(df["A"], df["B"])
     spread = df["A"] - beta * df["B"]
@@ -213,7 +218,11 @@ def analyze_pair(
             last_spread=last_spread,
             last_zscore=z,
             spread_series=spread,
+            prices=display_prices,
+            spread_zscores=zscores,
             performance=performance,
+            entry_z=entry_z,
+            exit_z=exit_z,
         )
 
     entry_upper = mean_spread + entry_z * std_spread
@@ -261,7 +270,11 @@ def analyze_pair(
         last_spread=last_spread,
         last_zscore=z,
         spread_series=spread,
+        prices=display_prices,
+        spread_zscores=zscores,
         performance=performance,
+        entry_z=entry_z,
+        exit_z=exit_z,
     )
 
 
@@ -279,6 +292,7 @@ def analyze_pair_momentum(
 
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
+    display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
     ratio = df["A"] / df["B"]
 
@@ -319,5 +333,9 @@ def analyze_pair_momentum(
         last_spread=cur,
         last_zscore=0.0,
         spread_series=ratio,
+        prices=display_prices,
+        spread_zscores=None,
         performance=None,
+        entry_z=None,
+        exit_z=None,
     )

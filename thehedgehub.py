@@ -138,14 +138,42 @@ def make_pair_panel() -> ui.nav_panel:
 
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart"),
                     ui.hr(),
                     ui.h4("Performance Metrics", style="color:#00E6A8;"),
                     ui.p(
-                        "These placeholders summarize key portfolio stats for the selected pair. The table will refresh once you run a new analysis.",
+                        "These metrics summarize key portfolio stats for the selected pair. The table refreshes after each analysis.",
                         style="color:#CCCCCC;"
                     ),
-                    ui.output_data_frame("performance_metrics")
+                    ui.output_data_frame("performance_metrics"),
+                    ui.hr(),
+                    ui.h4("Visualizations", style="color:#00E6A8;"),
+                    ui.p(
+                        "Explore the price trend of each stock, the long spread between the pair, and the standardized Z-score signal.",
+                        style="color:#CCCCCC;"
+                    ),
+                    ui.layout_columns(
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Price Trend", style="color:#00E6A8;"),
+                                output_widget("price_trend_chart"),
+                            ),
+                        ),
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Long Spread", style="color:#00E6A8;"),
+                                output_widget("spread_chart"),
+                            ),
+                        ),
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.h5("Z-Score", style="color:#00E6A8;"),
+                                output_widget("zscore_chart"),
+                            ),
+                        ),
+                    ),
                 )
             )
         )
@@ -396,32 +424,6 @@ def server(input, output, session):
         return "Enter stock tickers and a date range, then click Run Pair Test."
 
 
-    @render_widget
-    def pair_chart():
-        result = analysis_result.get()
-        if result is None or result.spread_series.empty:
-            return px.line()
-
-        df = pd.DataFrame({
-            "date": result.spread_series.index,
-            "spread": result.spread_series.values
-        })
-
-        fig = px.line(df, x="date", y="spread")
-        fig.update_traces(line_color="#00E6A8")
-
-        fig.update_layout(
-            plot_bgcolor="#0F1A1A",
-            paper_bgcolor="#0F1A1A",
-            font_color="#CCCCCC"
-        )
-
-        fig.update_xaxes(showgrid=False, zeroline=False)
-        fig.update_yaxes(showgrid=False, zeroline=False)
-
-        return fig
-
-
     @render.data_frame
     def performance_metrics():
         ticker_a = (input.stock_a() or "Stock A").upper()
@@ -511,6 +513,79 @@ def server(input, output, session):
         ]
 
         return pd.DataFrame(data)
+
+
+    def _style_figure(fig):
+        fig.update_layout(
+            plot_bgcolor="#0F1A1A",
+            paper_bgcolor="#0F1A1A",
+            font_color="#CCCCCC",
+            legend_font_color="#CCCCCC",
+        )
+        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_yaxes(showgrid=False, zeroline=False)
+        return fig
+
+
+    @render_widget
+    def price_trend_chart():
+        result = analysis_result.get()
+        prices = result.prices if result else None
+
+        if prices is None or prices.empty:
+            return px.line()
+
+        price_df = prices.copy()
+        price_df = price_df.reset_index()
+        price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        value_cols = [c for c in price_df.columns if c != "date"]
+
+        fig = px.line(
+            price_df,
+            x="date",
+            y=value_cols,
+            color_discrete_sequence=["#00E6A8", "#00A2FF"],
+        )
+        return _style_figure(fig)
+
+
+    @render_widget
+    def spread_chart():
+        result = analysis_result.get()
+
+        if result is None or result.spread_series.empty:
+            return px.line()
+
+        df = pd.DataFrame({
+            "date": result.spread_series.index,
+            "spread": result.spread_series.values
+        })
+
+        fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
+        fig.update_traces(line_width=2)
+        return _style_figure(fig)
+
+
+    @render_widget
+    def zscore_chart():
+        result = analysis_result.get()
+        zscores = result.spread_zscores if result else None
+
+        if zscores is None or zscores.empty:
+            return px.line()
+
+        df = pd.DataFrame({
+            "date": zscores.index,
+            "zscore": zscores.values
+        })
+
+        fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
+        fig.update_traces(line_width=2)
+        fig.add_hline(y=2, line_dash="dot", line_color="#FFB347", opacity=0.6)
+        fig.add_hline(y=-2, line_dash="dot", line_color="#FFB347", opacity=0.6)
+        fig.add_hline(y=0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        fig.add_hline(y=-0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        return _style_figure(fig)
 
 
     # ----- Strategy panel -----
