@@ -58,6 +58,32 @@ def make_home_panel() -> ui.nav_panel:
                     ),
 
                     ui.hr(),
+                    ui.h3("How Pairs Trading Works", style="color:#00E6A8; text-align:center;"),
+                    ui.p(
+                        "Pairs trading looks for two historically related assets whose price relationship briefly drifts away from its long-run trend.",
+                        style="text-align:center; color:#CCCCCC;"
+                    ),
+                    ui.tags.ol(
+                        {
+                            "style": """
+                                max-width: 720px;
+                                margin: 0 auto;
+                                color: #CCCCCC;
+                                line-height: 1.6;
+                                text-align: left;
+                            """
+                        },
+                        ui.tags.li("Select two instruments that tend to move together (correlated fundamentals or price history)."),
+                        ui.tags.li("Track the spread—often the difference or ratio between the two prices—to understand their relationship."),
+                        ui.tags.li("Standardize the spread into a Z-score so you know how extreme the current divergence is versus history."),
+                        ui.tags.li("Enter a market-neutral trade when the Z-score breaches an entry threshold (e.g., ±2)."),
+                        ui.tags.li("Exit when the spread mean-reverts, a stop triggers, or the holding period limit is reached.")
+                    ),
+                    ui.p(
+                        "Because the logic is statistical, you can apply the workflow above to any qualified pair—equities, ETFs, or other assets—once you confirm the relationship is stable enough for mean reversion.",
+                        style="text-align:center; color:#CCCCCC;"
+                    ),
+                    ui.hr(),
                     ui.input_action_button(
                         "go_to_analysis",
                         "Start Analysis",
