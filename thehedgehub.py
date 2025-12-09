@@ -281,6 +281,41 @@ app_ui = ui.page_fillable(
 
 def server(input, output, session):
 
+    last_pair_inputs = reactive.Value(None)
+    last_pair_result = reactive.Value(None)
+
+    def _fetch_pair_result():
+        ticker_a = input.stock_a()
+        ticker_b = input.stock_b()
+        date_range = input.date_range()
+
+        if not ticker_a or not ticker_b or not date_range:
+            return None, "Please enter stock tickers and date range."
+
+        key = (ticker_a, ticker_b, tuple(str(d) for d in date_range))
+        cached_key = last_pair_inputs.get()
+        cached_result = last_pair_result.get()
+
+        if cached_key == key and cached_result is not None:
+            return cached_result, None
+
+        start, end = date_range
+        try:
+            result = analyze_pair(
+                ticker_a=ticker_a,
+                ticker_b=ticker_b,
+                start=str(start),
+                end=str(end)
+            )
+        except Exception as e:
+            last_pair_inputs.set(None)
+            last_pair_result.set(None)
+            return None, f"Error: {e}"
+
+        last_pair_inputs.set(key)
+        last_pair_result.set(result)
+        return result, None
+
     # ----- Navbar interactions -----
     @reactive.effect
     @reactive.event(input.go_to_analysis)
@@ -295,89 +330,109 @@ def server(input, output, session):
     @render.text
     @reactive.event(input.run_analysis)
     def pair_test_result():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
-        date_range = input.date_range()
-
-        if not ticker_a or not ticker_b or not date_range:
-            return "Please enter stock tickers and date range."
-
-        start, end = date_range
-
-        try:
-            result = analyze_pair(
-                ticker_a=ticker_a,
-                ticker_b=ticker_b,
-                start=str(start),
-                end=str(end)
-            )
-        except Exception as e:
-            return f"Error: {e}"
-
+        result, error = _fetch_pair_result()
+        if error:
+            return error
         return result.explanation
 
 
     @render_widget
     @reactive.event(input.run_analysis)
     def pair_chart():
-        ticker_a = input.stock_a()
-        ticker_b = input.stock_b()
-        date_range = input.date_range()
-
-        if not ticker_a or not ticker_b or not date_range:
+        result, error = _fetch_pair_result()
+        if error or result is None:
             return px.line()
 
-        start, end = date_range
+        df = pd.DataFrame({
+            "date": result.spread_series.index,
+            "spread": result.spread_series.values
+        })
 
-        try:
-            result = analyze_pair(
-                ticker_a=ticker_a,
-                ticker_b=ticker_b,
-                start=str(start),
-                end=str(end)
-            )
+        fig = px.line(df, x="date", y="spread")
+        fig.update_traces(line_color="#00E6A8")
 
-            df = pd.DataFrame({
-                "date": result.spread_series.index,
-                "spread": result.spread_series.values
-            })
+        fig.update_layout(
+            plot_bgcolor="#0F1A1A",
+            paper_bgcolor="#0F1A1A",
+            font_color="#CCCCCC"
+        )
 
-            fig = px.line(df, x="date", y="spread")
-            fig.update_traces(line_color="#00E6A8")
+        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_yaxes(showgrid=False, zeroline=False)
 
-            fig.update_layout(
-                plot_bgcolor="#0F1A1A",
-                paper_bgcolor="#0F1A1A",
-                font_color="#CCCCCC"
-            )
-
-            fig.update_xaxes(showgrid=False, zeroline=False)
-            fig.update_yaxes(showgrid=False, zeroline=False)
-
-            return fig
-
-        except Exception:
-            return px.line()
+        return fig
 
 
     @render.data_frame
     @reactive.event(input.run_analysis)
     def performance_metrics():
-        ticker_a = input.stock_a() or "Stock A"
-        ticker_b = input.stock_b() or "Stock B"
+        result, error = _fetch_pair_result()
+        if error or result is None:
+            return pd.DataFrame(
+                [{"Metric": "Status", "Value": error or "Unavailable", "Notes": "Unable to compute metrics"}]
+            )
 
-        data = [
-            {"Metric": "Initial Capital", "Value": "$1,000,000", "Notes": "Placeholder amount"},
-            {"Metric": "Final Value", "Value": "$1,000,000", "Notes": "Pending calculation"},
-            {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Sharpe Ratio", "Value": "0.00", "Notes": "Calculated after live backtest"},
-            {"Metric": "Max Drawdown", "Value": "0.00%", "Notes": "Calculated after live backtest"},
-            {"Metric": "Total Trades", "Value": "0", "Notes": f"Waiting for trades from {ticker_a}/{ticker_b}"},
+        perf = result.performance or {}
+
+        def fmt_currency(value):
+            if value is None:
+                return "N/A"
+            return f"${value:,.2f}"
+
+        def fmt_percent(value):
+            if value is None:
+                return "N/A"
+            return f"{value * 100:.2f}%"
+
+        def fmt_ratio(value):
+            if value is None:
+                return "N/A"
+            return f"{value:.2f}"
+
+        rows = [
+            {
+                "Metric": "Initial Capital",
+                "Value": fmt_currency(perf.get("initial_capital")),
+                "Notes": "Base capital allocated to the pair strategy",
+            },
+            {
+                "Metric": "Final Value",
+                "Value": fmt_currency(perf.get("final_value")),
+                "Notes": "Marked-to-market portfolio equity at the end of the sample",
+            },
+            {
+                "Metric": "Total Return",
+                "Value": fmt_percent(perf.get("total_return")),
+                "Notes": "Overall growth relative to initial capital",
+            },
+            {
+                "Metric": "Annualized Return",
+                "Value": fmt_percent(perf.get("annualized_return")),
+                "Notes": "Return scaled to a 252-trading-day year",
+            },
+            {
+                "Metric": "Annualized Volatility",
+                "Value": fmt_percent(perf.get("annualized_volatility")),
+                "Notes": "Standard deviation of daily equity changes (annualized)",
+            },
+            {
+                "Metric": "Sharpe Ratio",
+                "Value": fmt_ratio(perf.get("sharpe_ratio")),
+                "Notes": "Return per unit of volatility (risk-free assumed 0%)",
+            },
+            {
+                "Metric": "Max Drawdown",
+                "Value": fmt_percent(perf.get("max_drawdown")),
+                "Notes": "Largest peak-to-trough decline during the sample",
+            },
+            {
+                "Metric": "Total Trades",
+                "Value": perf.get("total_trades", 0),
+                "Notes": "Number of simulated entry events triggered by Z-score thresholds",
+            },
         ]
 
-        return pd.DataFrame(data)
+        return pd.DataFrame(rows)
 
 
     # ----- Strategy panel -----
