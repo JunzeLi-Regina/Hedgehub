@@ -526,6 +526,10 @@ def server(input, output, session):
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
 
+    def _format_date_column(df: pd.DataFrame, column: str = "date") -> pd.DataFrame:
+        df[column] = pd.to_datetime(df[column]).dt.strftime("%Y-%m")
+        return df
+
 
     @render_widget
     def price_trend_chart():
@@ -535,9 +539,9 @@ def server(input, output, session):
         if prices is None or prices.empty:
             return px.line()
 
-        price_df = prices.copy()
-        price_df = price_df.reset_index()
+        price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        price_df = _format_date_column(price_df, "date")
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -560,6 +564,7 @@ def server(input, output, session):
             "date": result.spread_series.index,
             "spread": result.spread_series.values
         })
+        df = _format_date_column(df, "date")
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -578,6 +583,7 @@ def server(input, output, session):
             "date": zscores.index,
             "zscore": zscores.values
         })
+        df = _format_date_column(df, "date")
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
