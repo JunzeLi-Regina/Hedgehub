@@ -58,6 +58,32 @@ def make_home_panel() -> ui.nav_panel:
                     ),
 
                     ui.hr(),
+                    ui.h3("How Pairs Trading Works", style="color:#00E6A8; text-align:center;"),
+                    ui.p(
+                        "Pairs trading looks for two historically related assets whose price relationship briefly drifts away from its long-run trend.",
+                        style="text-align:center; color:#CCCCCC;"
+                    ),
+                    ui.tags.ol(
+                        {
+                            "style": """
+                                max-width: 720px;
+                                margin: 0 auto;
+                                color: #CCCCCC;
+                                line-height: 1.6;
+                                text-align: left;
+                            """
+                        },
+                        ui.tags.li("Select two instruments that tend to move together (correlated fundamentals or price history)."),
+                        ui.tags.li("Track the spread—often the difference or ratio between the two prices—to understand their relationship."),
+                        ui.tags.li("Standardize the spread into a Z-score so you know how extreme the current divergence is versus history."),
+                        ui.tags.li("Enter a market-neutral trade when the Z-score breaches an entry threshold (e.g., ±2)."),
+                        ui.tags.li("Exit when the spread mean-reverts, a stop triggers, or the holding period limit is reached.")
+                    ),
+                    ui.p(
+                        "Because the logic is statistical, you can apply the workflow above to any qualified pair—equities, ETFs, or other assets—once you confirm the relationship is stable enough for mean reversion.",
+                        style="text-align:center; color:#CCCCCC;"
+                    ),
+                    ui.hr(),
                     ui.input_action_button(
                         "go_to_analysis",
                         "Start Analysis",
@@ -87,9 +113,17 @@ def make_pair_panel() -> ui.nav_panel:
                                            class_="btn btn-outline-success"),
                     ui.hr(),
 
+                    ui.h4("Performance Metrics", style="color:#00E6A8;"),
+                    ui.p(
+                        "These placeholders summarize key portfolio stats for the selected pair. The table will refresh once you run a new analysis.",
+                        style="color:#CCCCCC;"
+                    ),
+                    ui.output_data_frame("performance_metrics"),
+                    ui.hr(),
+
                     ui.h4("Results", style="color:#00E6A8;"),
                     ui.output_text_verbatim("pair_test_result"),
-                    output_widget("pair_chart")
+                    output_widget("pair_chart"),
                 )
             )
         )
@@ -360,6 +394,26 @@ def server(input, output, session):
 
         except Exception:
             return px.line()
+
+
+    @render.data_frame
+    @reactive.event(input.run_analysis)
+    def performance_metrics():
+        ticker_a = input.stock_a() or "Stock A"
+        ticker_b = input.stock_b() or "Stock B"
+
+        data = [
+            {"Metric": "Initial Capital", "Value": "$1,000,000", "Notes": "Placeholder amount"},
+            {"Metric": "Final Value", "Value": "$1,000,000", "Notes": "Pending calculation"},
+            {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Sharpe Ratio", "Value": "0.00", "Notes": "Calculated after live backtest"},
+            {"Metric": "Max Drawdown", "Value": "0.00%", "Notes": "Calculated after live backtest"},
+            {"Metric": "Total Trades", "Value": "0", "Notes": f"Waiting for trades from {ticker_a}/{ticker_b}"},
+        ]
+
+        return pd.DataFrame(data)
 
 
     # ----- Strategy panel -----
