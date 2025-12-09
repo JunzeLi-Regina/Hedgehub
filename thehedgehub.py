@@ -117,6 +117,20 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
+                    ui.input_numeric(
+                        "initial_capital",
+                        "Initial Capital ($)",
+                        1_000_000,
+                        min=10_000,
+                        step=10_000,
+                    ),
+                    ui.input_numeric(
+                        "shares_per_trade",
+                        "Shares per Trade",
+                        100,
+                        min=1,
+                        step=10,
+                    ),
 
                     ui.input_action_button("run_analysis", "Run Pair Test",
                                            class_="btn btn-outline-success"),
@@ -413,6 +427,8 @@ def server(input, output, session):
         ticker_a = (input.stock_a() or "Stock A").upper()
         ticker_b = (input.stock_b() or "Stock B").upper()
         pair_label = f"{ticker_a}/{ticker_b}"
+        user_capital = float(input.initial_capital() or 1_000_000.0)
+        shares_per_trade = int(input.shares_per_trade() or 0)
 
         result = analysis_result.get()
         metrics = result.performance if result else None
@@ -420,8 +436,21 @@ def server(input, output, session):
         if result is None or metrics is None:
             waiting_note = analysis_error.get() or f"Waiting for trades from {pair_label}"
             data = [
-                {"Metric": "Initial Capital", "Value": "$1,000,000.00", "Notes": "Configured once analysis runs"},
-                {"Metric": "Final Value", "Value": "$1,000,000.00", "Notes": "Pending calculation"},
+                {
+                    "Metric": "Initial Capital",
+                    "Value": format_currency(user_capital),
+                    "Notes": "Configured once analysis runs",
+                },
+                {
+                    "Metric": "Shares per Trade",
+                    "Value": f"{shares_per_trade:,}",
+                    "Notes": "User-defined size per signal",
+                },
+                {
+                    "Metric": "Final Value",
+                    "Value": format_currency(user_capital),
+                    "Notes": "Pending calculation",
+                },
                 {"Metric": "Total Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
                 {"Metric": "Annualized Return", "Value": "0.00%", "Notes": "Calculated after live backtest"},
                 {"Metric": "Annualized Volatility", "Value": "0.00%", "Notes": "Calculated after live backtest"},
@@ -431,15 +460,22 @@ def server(input, output, session):
             ]
             return pd.DataFrame(data)
 
+        scaled_final_value = user_capital * (1 + metrics.total_return)
+
         data = [
             {
                 "Metric": "Initial Capital",
-                "Value": format_currency(metrics.initial_capital),
+                "Value": format_currency(user_capital),
                 "Notes": "Starting notional used for backtest",
             },
             {
+                "Metric": "Shares per Trade",
+                "Value": f"{shares_per_trade:,}",
+                "Notes": "Size submitted on each entry signal",
+            },
+            {
                 "Metric": "Final Value",
-                "Value": format_currency(metrics.final_value),
+                "Value": format_currency(scaled_final_value),
                 "Notes": f"Strategy valuation after testing {pair_label}",
             },
             {
