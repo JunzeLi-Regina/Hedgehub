@@ -26,89 +26,132 @@ def make_home_panel() -> ui.nav_panel:
             ui.column(
                 12,
                 ui.card(
+                    # ---------------- Header ----------------
                     ui.h1("Welcome to HedgeHub", class_="text-center", style="color:#00E6A8;"),
                     ui.h4(
-                        "Smart Pair Trading Analysis Platform",
+                        "Smart Pairs Trading Analysis Platform",
                         class_="text-center",
-                        style="color:#00E6A8;",
+                        style="color:#00E6A8; opacity:0.85;",
                     ),
                     ui.hr(),
-                    ui.tags.iframe(
-                        src="https://www.youtube.com/embed/dQw4w9WgXcQ",
-                        width="100%",
-                        height="400px",
-                        style="border:none;border-radius:15px;",
+
+                    # ---------------- Video ----------------
+                    ui.div(
+                        ui.tags.iframe(
+                            src="https://www.youtube.com/embed/xeG0kFzV2WM",
+                            width="100%",
+                            height="380px",
+                            style="border:none; border-radius:15px;",
+                        ),
+                        style="max-width:900px; margin:0 auto;",
                     ),
+
                     ui.hr(),
+
+                    # ---------------- Feature Cards (MORE TEXT VERSION) ----------------
                     ui.div(
                         {
                             "style": """
-                                display: flex;
-                                justify-content: center;
-                                gap: 40px;
-                                margin-top: 20px;
-                                padding-bottom: 10px;
+                                display:flex;
+                                justify-content:center;
+                                gap:25px;
+                                margin-top:20px;
+                                padding-bottom:10px;
                             """
                         },
+
+                        # ------- Card 1 -------
                         ui.card(
                             ui.h4("Analyze Pairs", style="color:#00E6A8; text-align:center;"),
+
                             ui.p(
-                                "Test if two stocks form a cointegrated pair.",
-                                style="text-align:center; color:#CCCCCC;",
+                                "Identify statistically related pairs and evaluate long-term stability.",
+                                style="color:#CCCCCC; text-align:center; font-size:14px;"
                             ),
+
+                            ui.tags.ul(
+                                ui.tags.li("Run cointegration and correlation tests"),
+                                ui.tags.li("Visualize price spreads & divergence patterns"),
+                                ui.tags.li("Detect pairs suitable for mean-reversion"),
+                                style="color:#CCCCCC; font-size:14px;"
+                            ),
+                            style="padding:18px; width:300px; min-height:230px;"
                         ),
+
+                        # ------- Card 2 -------
                         ui.card(
                             ui.h4("Generate Strategy", style="color:#00E6A8; text-align:center;"),
+
                             ui.p(
-                                "Get long/short suggestions based on signals.",
-                                style="text-align:center; color:#CCCCCC;",
+                                "Build a market-neutral long/short strategy from spread signals.",
+                                style="color:#CCCCCC; text-align:center; font-size:14px;"
                             ),
+
+                            ui.tags.ul(
+                                ui.tags.li("Compute real-time Z-scores"),
+                                ui.tags.li("Set entry/exit thresholds"),
+                                ui.tags.li("Generate actionable long/short signals"),
+                                style="color:#CCCCCC; font-size:14px;"
+                            ),
+                            style="padding:18px; width:300px; min-height:230px;"
                         ),
+
+                        # ------- Card 3 -------
                         ui.card(
                             ui.h4("Market Insights", style="color:#00E6A8; text-align:center;"),
+
                             ui.p(
-                                "Follow financial news and sentiment for your pair.",
-                                style="text-align:center; color:#CCCCCC;",
+                                "Monitor external catalysts that may affect spread movements.",
+                                style="color:#CCCCCC; text-align:center; font-size:14px;"
                             ),
+
+                            ui.tags.ul(
+                                ui.tags.li("Track news, sentiment & macro events"),
+                                ui.tags.li("Identify narrative shifts in the market"),
+                                ui.tags.li("Spot risk factors behind divergence"),
+                                style="color:#CCCCCC; font-size:14px;"
+                            ),
+                            style="padding:18px; width:300px; min-height:230px;"
                         ),
                     ),
+
                     ui.hr(),
-                    ui.h3("How Pairs Trading Works", style="color:#00E6A8; text-align:center;"),
+
+                    # ---------------- How Pairs Trading Works ----------------
+                    ui.h3("How Pairs Trading Works", style="color:#00E6A8; text-align:center; margin-top:10px;"),
+
                     ui.p(
-                        "Pairs trading looks for two historically related assets whose price relationship briefly drifts away from its long-run trend.",
-                        style="text-align:center; color:#CCCCCC;",
+                        "Pairs trading identifies two assets that typically move together. "
+                        "When their price relationship temporarily diverges, a market-neutral opportunity appears.",
+                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:0 auto 15px auto;"
                     ),
+
                     ui.tags.ol(
                         {
                             "style": """
-                                max-width: 720px;
+                                max-width: 750px;
                                 margin: 0 auto;
                                 color: #CCCCCC;
-                                line-height: 1.6;
-                                text-align: left;
+                                line-height: 1.65;
+                                font-size: 16px;
+                                padding-left: 15px;
                             """
                         },
-                        ui.tags.li(
-                            "Select two instruments that tend to move together (correlated fundamentals or price history)."
-                        ),
-                        ui.tags.li(
-                            "Track the spread—often the difference or ratio between the two prices—to understand their relationship."
-                        ),
-                        ui.tags.li(
-                            "Standardize the spread into a Z-score so you know how extreme the current divergence is versus history."
-                        ),
-                        ui.tags.li(
-                            "Enter a market-neutral trade when the Z-score breaches an entry threshold (e.g., ±2)."
-                        ),
-                        ui.tags.li(
-                            "Exit when the spread mean-reverts, a stop triggers, or the holding period limit is reached."
-                        ),
+                        ui.tags.li("Select a pair of assets with correlated movements."),
+                        ui.tags.li("Measure their spread to understand divergence."),
+                        ui.tags.li("Convert the spread into a Z-score to standardize extremity."),
+                        ui.tags.li("Generate long/short signals when thresholds are breached (e.g., ±2)."),
+                        ui.tags.li("Exit positions when the spread reverts to the mean."),
                     ),
+
                     ui.p(
-                        "Because the logic is statistical, you can apply the workflow above to any qualified pair—equities, ETFs, or other assets—once you confirm the relationship is stable enough for mean reversion.",
-                        style="text-align:center; color:#CCCCCC;",
+                        "Because the logic is statistical, this workflow applies to equities, ETFs, or any assets with sufficiently stable long-term relationships.",
+                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:15px auto;"
                     ),
+
                     ui.hr(),
+
+                    # ---------------- CTA Button ----------------
                     ui.input_action_button(
                         "go_to_analysis",
                         "Start Analysis",
@@ -118,6 +161,7 @@ def make_home_panel() -> ui.nav_panel:
             )
         ),
     )
+
 
 
 def make_pair_panel() -> ui.nav_panel:
@@ -203,19 +247,115 @@ def make_strategy_panel() -> ui.nav_panel:
             ui.column(
                 12,
                 ui.card(
-                    ui.h3("Strategy Suggestions", style="color:#00E6A8;"),
-                    ui.p("Configure your preferences.", style="color:#CCCCCC;"),
-                    ui.input_numeric("investment_amount", "Investment Amount ($)", 10000),
-                    ui.input_select("risk_level", "Risk Level", ["Low", "Medium", "High"]),
+
+                    # -------------------------------------
+                    # Title + Intro
+                    # -------------------------------------
+                    ui.h3("📈 Strategy Suggestions", 
+                          style="color:#00E6A8; margin-bottom:8px;"),
+
+                    ui.p(
+                        "Generate a market-neutral long/short strategy tailored to your investment amount and risk preferences.",
+                        style="color:#CCCCCC; margin-bottom:20px;"
+                    ),
+
+                    # -------------------------------------
+                    # Section 1 — Preferences
+                    # -------------------------------------
+                    ui.h4("📝 1. Configure Your Preferences",
+                          style="color:#00E6A8; margin-top:10px;"),
+
+                    # Investment Amount
+                    ui.input_numeric(
+                        "investment_amount",
+                        "💰 Investment Amount ($)",
+                        10000,
+                        min=1000,
+                        max=1000000,
+                        step=500
+                    ),
+
+                    ui.p(
+                        "💡 Typical range for pair-trading portfolios: $1,000–$500,000. "
+                        "More capital enables more stable position sizing and smoother equity curves.",
+                        style="color:#AAAAAA; margin-top:4px; margin-bottom:18px;"
+                    ),
+
+                    # Risk Level
+                    ui.input_select(
+                        "risk_level",
+                        "⚖️ Risk Level",
+                        ["Low", "Medium", "High"]
+                    ),
+
+                    ui.tags.ul(
+                        ui.tags.li("Low – Fewer trades, wider thresholds, smaller position sizes, minimal leverage."),
+                        ui.tags.li("Medium – Balanced trade frequency and leverage."),
+                        ui.tags.li("High – More aggressive signals, tighter thresholds, higher leverage and drawdown."),
+                        style="color:#CCCCCC; font-size:14px; margin-top:4px;"
+                    ),
+
+                    ui.hr(),
+
+                    # -------------------------------------
+                    # Section 2 — Z-score Explanation
+                    # -------------------------------------
+                    ui.h4("📊 2. Understanding Z-score (Core Signal)",
+                          style="color:#00E6A8; margin-top:10px;"),
+
+                    ui.p(
+                        "The Z-score measures how far the current price spread deviates from its historical average. "
+                        "It standardizes spread movements to detect statistically abnormal divergence.",
+                        style="color:#CCCCCC; margin-bottom:10px;"
+                    ),
+
+                    ui.tags.ul(
+                        ui.tags.li("Z > 2 → Spread unusually wide → Short overpriced asset, long underpriced asset."),
+                        ui.tags.li("Z < -2 → Spread unusually tight → Long overpriced asset, short underpriced asset."),
+                        ui.tags.li("Higher-risk profiles use smaller Z-thresholds for more frequent signals."),
+                        style="color:#CCCCCC; font-size:14px;"
+                    ),
+
+                    ui.p(
+                        "Z-score defines when to enter and exit trades. Your selected risk level changes how sensitive these thresholds are.",
+                        style="color:#AAAAAA; margin-top:6px; margin-bottom:18px;"
+                    ),
+
+                    ui.hr(),
+
+                    # -------------------------------------
+                    # Button
+                    # -------------------------------------
                     ui.input_action_button(
                         "generate_strategy",
-                        "Generate Strategy",
-                        class_="btn btn-outline-success",
+                        "🚀 Generate Strategy",
+                        class_="btn btn-success btn-lg",
+                        style="margin-top:10px; margin-bottom:15px;"
                     ),
+
                     ui.hr(),
-                    ui.h4("Recommended Strategy", style="color:#00E6A8;"),
-                    ui.output_text_verbatim("strategy_output"),
+
+                    # -------------------------------------
+                    # Section 3 — Recommended Strategy Output
+                    # -------------------------------------
+                    ui.h4("📘 Recommended Strategy",
+                          style="color:#00E6A8; margin-top:5px;"),
+
+                    ui.p(
+                        "Based on your inputs, the model generates recommended allocations, entry/exit thresholds, "
+                        "expected trade behaviour, and a rationale for how the strategy adapts to your profile.",
+                        style="color:#CCCCCC; margin-bottom:12px;"
+                    ),
+
+                    # Dynamic text returned by server
+                    ui.div(
+                        ui.output_text_verbatim("strategy_output"),
+                        style="white-space:pre-line; color:#CCCCCC; margin-bottom:12px;"
+                    ),
+
+                    # Chart
                     output_widget("strategy_chart"),
+
                 ),
             )
         ),
@@ -229,15 +369,45 @@ def make_about_panel() -> ui.nav_panel:
             ui.column(
                 12,
                 ui.card(
-                    ui.h3("About HedgeHub", style="color:#00E6A8;"),
-                    ui.p("Developed by Duke FinTech Students (2025).", style="color:#CCCCCC;"),
-                    ui.p("Contact: jl1319@duke.edu", style="color:#CCCCCC;"),
+                    {"style": "max-width: 900px; margin: 0 auto; padding: 30px;"},
+                    ui.h3("About HedgeHub", style="color:#00E6A8; text-align:center;"),
+
                     ui.p(
-                        "This platform is for educational purposes only and not financial advice.",
-                        style="color:#CCCCCC;",
+                        "HedgeHub is a smart pairs trading analytics platform built by Duke FinTech students. "
+                        "It provides an intuitive, data-driven interface for exploring price relationships, testing "
+                        "cointegration, analyzing spreads, and generating market-neutral trading insights.",
+                        style="color:#CCCCCC; text-align:center;",
                     ),
+
+                    ui.p(
+                        "Pairs trading identifies two historically related assets whose price spread temporarily diverges. "
+                        "When this spread reaches statistically extreme levels, a long/short strategy may profit from mean reversion. "
+                        "HedgeHub helps users visualize these dynamics and evaluate strategy performance in an accessible way.",
+                        style="color:#CCCCCC; text-align:center;",
+                    ),
+
                     ui.hr(),
-                    ui.p("© 2025 HedgeHub Analytics", class_="text-center", style="color:#CCCCCC;"),
+
+                    ui.h4("Team", style="color:#00E6A8; text-align:center;"),
+                    ui.div(
+                        {"style": "text-align:center; line-height: 1.8; color:#CCCCCC;"},
+                        ui.p("Junze Li — Email: jl1319@duke.edu"),
+                        ui.p("Celia Du — Email: xd90@duke.edu"),
+                        ui.p("Zifei Yang — Email: zy204@duke.edu"),
+                    ),
+
+                    ui.hr(),
+
+                    ui.p(
+                        "This platform is for educational and research purposes only and does not constitute financial advice.",
+                        style="color:#CCCCCC; text-align:center; font-size:0.9rem; opacity:0.8;",
+                    ),
+
+                    ui.p(
+                        "© 2025 HedgeHub Analytics",
+                        class_="text-center",
+                        style="color:#CCCCCC; margin-top:10px;",
+                    ),
                 ),
             )
         ),
@@ -284,7 +454,7 @@ app_ui = ui.page_fillable(
                 font-size: 1.5rem;
                 color: #00E6A8;
             }
-            .nav-link { color: #C0C0C0 !重要; transition: all 0.3s; }
+            .nav-link { color: #FFFFFF !important; transition: all 0.3s; }
             .nav-link.active { color:#00E6A8 !important; border-bottom:2px solid #00E6A8; }
             .nav-link:hover { color:#00E6A8 !important; text-shadow:0 0 6px #00E6A8; }
             .card {
