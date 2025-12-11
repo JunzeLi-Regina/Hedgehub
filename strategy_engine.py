@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 import math
 
@@ -29,10 +28,10 @@ class PerformanceMetrics:
 # ---------------------------------------------------------
 @dataclass
 class PairResult:
-    pair_ok: bool                      # Whether cointegration / mean reversion is valid
-    mode: str                          # "mean_reversion" or "momentum"
-    signal: str                        # Machine-friendly signal code
-    explanation: str                   # Human-readable strategy explanation
+    pair_ok: bool                  # Whether the pair passes cointegration test
+    mode: str                      # "pairs_trading" or "momentum"
+    signal: str                    # Machine-friendly signal code
+    explanation: str               # Human-readable strategy explanation
     hedge_ratio: float
     coint_pvalue: float
     last_spread: float
@@ -52,19 +51,30 @@ class StrategyPlan:
     risk_level: str
     signal_type: str
     rationale: str
-    entry_z: float
-    exit_z: float
+    entry_z: float | None
+    exit_z: float | None
     spread_value: float
     zscore_value: float
     allocation_pct: float
     suggested_notional: float
 
-    # 🔥 新增字段：用于 position sizing
+    # for position sizing
     prices: pd.DataFrame | None = None
     hedge_ratio: float | None = None
     ticker_a: str | None = None
     ticker_b: str | None = None
 
+
+_RISK_PRESETS: dict[str, dict[str, float]] = {
+    "LOW": {"entry_z": 2.5, "exit_z": 0.75, "allocation_pct": 0.35},
+    "MEDIUM": {"entry_z": 2.0, "exit_z": 0.5, "allocation_pct": 0.5},
+    "HIGH": {"entry_z": 1.5, "exit_z": 0.35, "allocation_pct": 0.65},
+}
+
+
+# ---------------------------------------------------------
+# Position sizing helper
+# ---------------------------------------------------------
 def compute_positions(
     prices: pd.DataFrame,
     hedge_ratio: float,
@@ -87,14 +97,12 @@ def compute_positions(
             "price_b": 0.0,
         }
 
-    # ---- 自动获取列名 ----
     cols = list(prices.columns)
     if len(cols) < 2:
         raise ValueError("Price DataFrame does not contain two assets")
 
     col_a, col_b = cols[0], cols[1]
 
-    # 最新价格
     price_a = float(prices[col_a].iloc[-1])
     price_b = float(prices[col_b].iloc[-1])
 
@@ -104,18 +112,18 @@ def compute_positions(
     long_amount = invest_amount / (1 + hedge_ratio)
     short_amount = invest_amount * hedge_ratio / (1 + hedge_ratio)
 
-    # ---- 根据 signal 决定多空方向 ----
-    if "Long" in signal and col_a in signal:
+    signal_upper = (signal or "").upper()
+
+    if "LONG" in signal_upper and col_a.upper() in signal_upper:
         long_ticker, short_ticker = col_a, col_b
         long_shares = long_amount / price_a
         short_shares = short_amount / price_b
-
-    elif "Long" in signal and col_b in signal:
+    elif "LONG" in signal_upper and col_b.upper() in signal_upper:
         long_ticker, short_ticker = col_b, col_a
         long_shares = long_amount / price_b
         short_shares = short_amount / price_a
-
     else:
+        # no directional signal
         return {
             "long_ticker": "",
             "short_ticker": "",
@@ -139,15 +147,9 @@ def compute_positions(
     }
 
 
-
-
-_RISK_PRESETS: dict[str, dict[str, float]] = {
-    "LOW": {"entry_z": 2.5, "exit_z": 0.75, "allocation_pct": 0.35},
-    "MEDIUM": {"entry_z": 2.0, "exit_z": 0.5, "allocation_pct": 0.5},
-    "HIGH": {"entry_z": 1.5, "exit_z": 0.35, "allocation_pct": 0.65},
-}
-
-
+# ---------------------------------------------------------
+# Strategy plan generator
+# ---------------------------------------------------------
 def generate_strategy_plan(
     amount: float,
     risk_level: str,
@@ -155,7 +157,6 @@ def generate_strategy_plan(
     ticker_a: str | None = None,
     ticker_b: str | None = None,
 ) -> StrategyPlan:
-
     def _clean_label(label: str | None, fallback: str) -> str:
         if not label:
             return fallback
@@ -168,31 +169,53 @@ def generate_strategy_plan(
     preset_key = (risk_level or "MEDIUM").strip().upper()
     preset = _RISK_PRESETS.get(preset_key, _RISK_PRESETS["MEDIUM"])
 
-    entry_z = float(preset["entry_z"])
-    exit_z = float(preset["exit_z"])
+    entry_z: float | None = float(preset["entry_z"])
+    exit_z: float | None = float(preset["exit_z"])
     allocation_pct = float(preset["allocation_pct"])
 
     spread_value = 0.0
     zscore_value = 0.0
-    rationale = "Configure Pair Analysis to unlock live spread context."
-    hedge = None
-    prices = None
+    rationale = "Configure Pair Analysis to unlock live context."
+    hedge: float | None = None
+    prices: pd.DataFrame | None = None
+    signal_type = "Await Analysis"
 
     if pair_result is not None:
-        spread_value = float(pair_result.last_spread)
-        zscore_value = float(pair_result.last_zscore)
-        rationale = "Spread deviation versus long-term equilibrium."
-        hedge = pair_result.hedge_ratio
-        prices = pair_result.prices  # DataFrame with columns "A", "B"
+        mode = (pair_result.mode or "").lower()
 
-    # Determine signal
-    signal_type = "Wait for Entry"
-    if zscore_value >= entry_z:
-        signal_type = f"Short {label_a} Long {label_b}"
-    elif zscore_value <= -entry_z:
-        signal_type = f"Long {label_a} Short {label_b}"
-    elif pair_result is None:
-        signal_type = "Await Analysis"
+        # ---------- Momentum plan ----------
+        if mode == "momentum":
+            spread_value = float(pair_result.last_spread)   # ratio
+            zscore_value = 0.0
+            rationale = "Momentum ratio signal based on A/B breakout versus historical band."
+            hedge = 1.0
+            prices = pair_result.prices
+
+            if pair_result.signal == "momentum_buy_A_sell_B":
+                signal_type = f"Long {label_a} Short {label_b}"
+            elif pair_result.signal == "momentum_buy_B_sell_A":
+                signal_type = f"Long {label_b} Short {label_a}"
+            else:
+                signal_type = "Hold / No Momentum Signal"
+
+            # momentum 不用 entry/exit Z
+            entry_z = None
+            exit_z = None
+
+        # ---------- Pairs trading plan ----------
+        else:
+            spread_value = float(pair_result.last_spread)
+            zscore_value = float(pair_result.last_zscore)
+            rationale = "Spread deviation versus long-term equilibrium."
+            hedge = pair_result.hedge_ratio
+            prices = pair_result.prices
+
+            if zscore_value >= float(preset["entry_z"]):
+                signal_type = f"Short {label_a} Long {label_b}"
+            elif zscore_value <= -float(preset["entry_z"]):
+                signal_type = f"Long {label_a} Short {label_b}"
+            else:
+                signal_type = "Wait for Entry"
 
     sanitized_amount = max(0.0, float(amount or 0.0))
     suggested_notional = sanitized_amount * allocation_pct
@@ -207,8 +230,6 @@ def generate_strategy_plan(
         zscore_value=zscore_value,
         allocation_pct=allocation_pct,
         suggested_notional=suggested_notional,
-
-        # 🔥 新增字段：给 position sizing 用
         prices=prices,
         hedge_ratio=hedge,
         ticker_a=label_a,
@@ -217,9 +238,9 @@ def generate_strategy_plan(
 
 
 # ---------------------------------------------------------
-# Mean-reversion backtest on spread
+# Pairs trading backtest on spread
 # ---------------------------------------------------------
-def run_mean_reversion_backtest(
+def run_pairs_trading_backtest(
     price_frame: pd.DataFrame,
     beta: float,
     zscores: pd.Series,
@@ -256,19 +277,15 @@ def run_mean_reversion_backtest(
     for idx in range(1, rows):
         z = float(zscores.iloc[idx - 1])
 
-        # Exit when spread reverts into neutral zone
         if position != 0.0 and abs(z) <= exit_z:
             position = 0.0
 
-        # Open new position only when flat
         if position == 0.0:
             if z > entry_z:
-                # Spread too wide: short A, long B
-                position = -allocation
+                position = -allocation     # short A, long B
                 trades += 1
             elif z < -entry_z:
-                # Spread too tight: long A, short B
-                position = allocation
+                position = allocation      # long A, short B
                 trades += 1
 
         spread_return = (returns_a.iloc[idx] - beta * returns_b.iloc[idx]) / exposure_scale
@@ -349,7 +366,7 @@ def adf_test(series: pd.Series) -> float:
 
 
 # ---------------------------------------------------------
-# Mean-reversion pair analysis (primary engine)
+# Pairs trading analysis (primary engine)
 # ---------------------------------------------------------
 def analyze_pair(
     ticker_a: str,
@@ -365,14 +382,11 @@ def analyze_pair(
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
 
-    # For plotting in UI, keep user-friendly tickers
     display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
-    # Hedge ratio and spread
     beta = estimate_hedge_ratio(df["A"], df["B"])
     spread = df["A"] - beta * df["B"]
 
-    # Cointegration / mean-reversion test
     pvalue = adf_test(spread)
     pair_ok = pvalue < 0.05
 
@@ -387,8 +401,7 @@ def analyze_pair(
         last_z = 0.0
         zscores = pd.Series(0.0, index=spread.index)
 
-    # Always compute backtest once, so performance table can show something
-    performance = run_mean_reversion_backtest(
+    performance = run_pairs_trading_backtest(
         price_frame=df,
         beta=beta,
         zscores=zscores,
@@ -396,17 +409,17 @@ def analyze_pair(
         exit_z=exit_z,
     )
 
-    # If cointegration fails → no mean-reversion strategy
+    # 协整失败 → 不推荐 pairs trading
     if not pair_ok:
         explanation = (
             f"Cointegration test failed (ADF p-value = {pvalue:.3f}). "
-            "The price relationship does not show stable mean reversion. "
-            "Mean-reversion pairs trading is not recommended for this pair."
+            "The price relationship does not support stable spread trading. "
+            "Pairs trading is not recommended for this pair."
         )
 
         return PairResult(
             pair_ok=False,
-            mode="mean_reversion",
+            mode="pairs_trading",
             signal="no_pairs_trade_cointegration_failed",
             explanation=explanation,
             hedge_ratio=beta,
@@ -421,7 +434,7 @@ def analyze_pair(
             exit_z=exit_z,
         )
 
-    # Cointegration passes → construct entry/exit zones and signal
+    # 协整通过 → 构造 entry/exit 区间与 signal
     entry_upper = mean_spread + entry_z * std_spread
     entry_lower = mean_spread - entry_z * std_spread
     exit_low = mean_spread - exit_z * std_spread
@@ -456,7 +469,7 @@ def analyze_pair(
 
     return PairResult(
         pair_ok=True,
-        mode="mean_reversion",
+        mode="pairs_trading",
         signal=signal,
         explanation=explanation,
         hedge_ratio=beta,
@@ -473,7 +486,7 @@ def analyze_pair(
 
 
 # ---------------------------------------------------------
-# Momentum-based analysis (used only when user chooses)
+# Momentum-based analysis (used when cointegration fails)
 # ---------------------------------------------------------
 def analyze_pair_momentum(
     ticker_a: str,
@@ -500,8 +513,8 @@ def analyze_pair_momentum(
     if cur > high:
         signal = "momentum_buy_A_sell_B"
         explanation = (
-            "The price ratio A/B is above the upper breakout level, indicating upward momentum in A "
-            "relative to B. Suggested action: buy {a} and sell {b}. Suggested protective stop near ratio {stop:.4f}."
+            "The price ratio A/B is above the upper breakout level, indicating upward momentum in {a} "
+            "relative to {b}. Suggested action: buy {a} and sell {b}. Suggested protective stop near ratio {stop:.4f}."
         ).format(a=ticker_a, b=ticker_b, stop=stop_reference)
     elif cur < low:
         signal = "momentum_buy_B_sell_A"
@@ -517,11 +530,11 @@ def analyze_pair_momentum(
         )
 
     return PairResult(
-        pair_ok=False,
+        pair_ok=False,              # not cointegrated
         mode="momentum",
         signal=signal,
         explanation=explanation,
-        hedge_ratio=0.0,
+        hedge_ratio=1.0,
         coint_pvalue=0.0,
         last_spread=cur,
         last_zscore=0.0,

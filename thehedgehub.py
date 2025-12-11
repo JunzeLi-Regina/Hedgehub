@@ -5,11 +5,11 @@ import plotly.express as px
 
 from strategy_engine import (
     analyze_pair,
+    analyze_pair_momentum,
     generate_strategy_plan,
     StrategyPlan,
     compute_positions,
 )
-
 
 NAVBAR_ID = "main_nav"
 
@@ -33,14 +33,17 @@ def make_home_panel() -> ui.nav_panel:
                 12,
                 ui.card(
                     # ---------------- Header ----------------
-                    ui.h1("Welcome to HedgeHub", class_="text-center", style="color:#00E6A8;"),
+                    ui.h1(
+                        "Welcome to HedgeHub",
+                        class_="text-center",
+                        style="color:#00E6A8;",
+                    ),
                     ui.h4(
                         "Smart Pairs Trading Analysis Platform",
                         class_="text-center",
                         style="color:#00E6A8; opacity:0.85;",
                     ),
                     ui.hr(),
-
                     # ---------------- Video ----------------
                     ui.div(
                         ui.tags.iframe(
@@ -51,9 +54,8 @@ def make_home_panel() -> ui.nav_panel:
                         ),
                         style="max-width:900px; margin:0 auto;",
                     ),
-
                     ui.hr(),
-                    # ---------------- Feature Cards (MORE TEXT VERSION) ----------------
+                    # ---------------- Feature Cards ----------------
                     ui.div(
                         {
                             "style": """
@@ -64,73 +66,69 @@ def make_home_panel() -> ui.nav_panel:
                                 padding-bottom:10px;
                             """
                         },
-
-                        # ------- Card 1 -------
                         ui.card(
-                            ui.h4("Analyze Pairs", style="color:#00E6A8; text-align:center;"),
-
+                            ui.h4(
+                                "Analyze Pairs",
+                                style="color:#00E6A8; text-align:center;",
+                            ),
                             ui.p(
                                 "Identify statistically related pairs and evaluate long-term stability.",
-                                style="color:#CCCCCC; text-align:center; font-size:14px;"
+                                style="color:#CCCCCC; text-align:center; font-size:14px;",
                             ),
-
                             ui.tags.ul(
                                 ui.tags.li("Run cointegration and correlation tests"),
                                 ui.tags.li("Visualize price spreads & divergence patterns"),
-                                ui.tags.li("Detect pairs suitable for mean-reversion"),
-                                style="color:#CCCCCC; font-size:14px;"
+                                ui.tags.li("Detect pairs suitable for spread trading"),
+                                style="color:#CCCCCC; font-size:14px;",
                             ),
-                            style="padding:18px; width:300px; min-height:230px;"
+                            style="padding:18px; width:300px; min-height:230px;",
                         ),
-
-                        # ------- Card 2 -------
                         ui.card(
-                            ui.h4("Generate Strategy", style="color:#00E6A8; text-align:center;"),
-
-                            ui.p(
-                                "Build a market-neutral long/short strategy from spread signals.",
-                                style="color:#CCCCCC; text-align:center; font-size:14px;"
+                            ui.h4(
+                                "Generate Strategy",
+                                style="color:#00E6A8; text-align:center;",
                             ),
-
+                            ui.p(
+                                "Build a market-neutral long/short strategy from spread or ratio signals.",
+                                style="color:#CCCCCC; text-align:center; font-size:14px;",
+                            ),
                             ui.tags.ul(
-                                ui.tags.li("Compute real-time Z-scores"),
+                                ui.tags.li("Compute real-time spreads or ratios"),
                                 ui.tags.li("Set entry/exit thresholds"),
                                 ui.tags.li("Generate actionable long/short signals"),
-                                style="color:#CCCCCC; font-size:14px;"
+                                style="color:#CCCCCC; font-size:14px;",
                             ),
-                            style="padding:18px; width:300px; min-height:230px;"
+                            style="padding:18px; width:300px; min-height:230px;",
                         ),
-
-                        # ------- Card 3 -------
                         ui.card(
-                            ui.h4("Market Insights", style="color:#00E6A8; text-align:center;"),
-
-                            ui.p(
-                                "Monitor external catalysts that may affect spread movements.",
-                                style="color:#CCCCCC; text-align:center; font-size:14px;"
+                            ui.h4(
+                                "Market Insights",
+                                style="color:#00E6A8; text-align:center;",
                             ),
-
+                            ui.p(
+                                "Monitor external catalysts that may affect pair behaviour.",
+                                style="color:#CCCCCC; text-align:center; font-size:14px;",
+                            ),
                             ui.tags.ul(
                                 ui.tags.li("Track news, sentiment & macro events"),
                                 ui.tags.li("Identify narrative shifts in the market"),
                                 ui.tags.li("Spot risk factors behind divergence"),
-                                style="color:#CCCCCC; font-size:14px;"
+                                style="color:#CCCCCC; font-size:14px;",
                             ),
-                            style="padding:18px; width:300px; min-height:230px;"
+                            style="padding:18px; width:300px; min-height:230px;",
                         ),
                     ),
-
                     ui.hr(),
-
                     # ---------------- How Pairs Trading Works ----------------
-                    ui.h3("How Pairs Trading Works", style="color:#00E6A8; text-align:center; margin-top:10px;"),
-
+                    ui.h3(
+                        "How Pairs Trading Works",
+                        style="color:#00E6A8; text-align:center; margin-top:10px;",
+                    ),
                     ui.p(
                         "Pairs trading identifies two assets that typically move together. "
                         "When their price relationship temporarily diverges, a market-neutral opportunity appears.",
-                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:0 auto 15px auto;"
+                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:0 auto 15px auto;",
                     ),
-
                     ui.tags.ol(
                         {
                             "style": """
@@ -145,18 +143,19 @@ def make_home_panel() -> ui.nav_panel:
                         ui.tags.li("Select a pair of assets with correlated movements."),
                         ui.tags.li("Measure their spread to understand divergence."),
                         ui.tags.li("Convert the spread into a Z-score to standardize extremity."),
-                        ui.tags.li("Generate long/short signals when thresholds are breached (e.g., ±2)."),
-                        ui.tags.li("Exit positions when the spread reverts to the mean."),
+                        ui.tags.li(
+                            "Generate long/short signals when thresholds are breached (e.g., ±2)."
+                        ),
+                        ui.tags.li(
+                            "Exit positions when the spread moves back to the long-run relationship."
+                        ),
                     ),
-
                     ui.p(
-                        "Because the logic is statistical, this workflow applies to equities, ETFs, or any assets with sufficiently stable long-term relationships.",
-                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:15px auto;"
+                        "Because the logic is statistical, this workflow applies to equities, ETFs, "
+                        "or any assets with sufficiently stable long-term relationships.",
+                        style="text-align:center; color:#CCCCCC; max-width:850px; margin:15px auto;",
                     ),
-
                     ui.hr(),
-
-                    # ---------------- CTA Button ----------------
                     ui.input_action_button(
                         "go_to_analysis",
                         "Start Analysis",
@@ -168,7 +167,6 @@ def make_home_panel() -> ui.nav_panel:
     )
 
 
-
 def make_pair_panel() -> ui.nav_panel:
     return ui.nav_panel(
         "Pair Analysis",
@@ -177,7 +175,10 @@ def make_pair_panel() -> ui.nav_panel:
                 12,
                 ui.card(
                     ui.h3("Pair Analysis", style="color:#00E6A8;"),
-                    ui.p("Input your stock pair and run a basic pair test.", style="color:#CCCCCC;"),
+                    ui.p(
+                        "Input your stock pair and run a basic pair test.",
+                        style="color:#CCCCCC;",
+                    ),
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
@@ -206,14 +207,16 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.hr(),
                     ui.h4("Performance Metrics", style="color:#00E6A8;"),
                     ui.p(
-                        "These metrics summarize key portfolio stats for the selected pair. The table refreshes after each analysis.",
+                        "These metrics summarize key portfolio stats for the selected pair. "
+                        "The table refreshes after each analysis.",
                         style="color:#CCCCCC;",
                     ),
                     ui.output_data_frame("performance_metrics"),
                     ui.hr(),
                     ui.h4("Visualizations", style="color:#00E6A8;"),
                     ui.p(
-                        "Explore the price trend of each stock, the long spread between the pair, and the standardized Z-score signal.",
+                        "Explore the price trend of each stock, the spread or ratio between the pair, "
+                        "and the standardized Z-score signal when applicable.",
                         style="color:#CCCCCC;",
                     ),
                     ui.layout_columns(
@@ -227,14 +230,17 @@ def make_pair_panel() -> ui.nav_panel:
                         ui.column(
                             12,
                             ui.card(
-                                ui.h5("Long Spread", style="color:#00E6A8;"),
+                                ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
                                 output_widget("spread_chart"),
                             ),
                         ),
                         ui.column(
                             12,
                             ui.card(
-                                ui.h5("Z-Score", style="color:#00E6A8;"),
+                                ui.h5(
+                                    "Z-Score (Pairs Trading Only)",
+                                    style="color:#00E6A8;",
+                                ),
                                 output_widget("zscore_chart"),
                             ),
                         ),
@@ -252,82 +258,84 @@ def make_strategy_panel() -> ui.nav_panel:
             ui.column(
                 12,
                 ui.card(
-
                     # -------------------------------------
                     # Title + Intro
                     # -------------------------------------
-                    ui.h3("📈 Strategy Suggestions", 
-                          style="color:#00E6A8; margin-bottom:8px;"),
-
-                    ui.p(
-                        "Generate a market-neutral long/short strategy tailored to your investment amount and risk preferences.",
-                        style="color:#CCCCCC; margin-bottom:20px;"
+                    ui.h3(
+                        "📈 Strategy Suggestions",
+                        style="color:#00E6A8; margin-bottom:8px;",
                     ),
-
+                    ui.p(
+                        "Generate a market-neutral long/short strategy tailored to your investment amount "
+                        "and risk preferences.",
+                        style="color:#CCCCCC; margin-bottom:20px;",
+                    ),
                     # -------------------------------------
                     # Section 1 — Preferences
                     # -------------------------------------
-                    ui.h4("📝 1. Configure Your Preferences",
-                          style="color:#00E6A8; margin-top:10px;"),
-
-                    # Investment Amount
+                    ui.h4(
+                        "📝 1. Configure Your Preferences",
+                        style="color:#00E6A8; margin-top:10px;",
+                    ),
                     ui.input_numeric(
                         "investment_amount",
                         "💰 Investment Amount ($)",
                         10000,
                         min=1000,
                         max=1000000,
-                        step=500
+                        step=500,
                     ),
-
                     ui.p(
                         "💡 Typical range for pair-trading portfolios: $1,000–$500,000. "
                         "More capital enables more stable position sizing and smoother equity curves.",
-                        style="color:#AAAAAA; margin-top:4px; margin-bottom:18px;"
+                        style="color:#AAAAAA; margin-top:4px; margin-bottom:18px;",
                     ),
-
-                    # Risk Level
                     ui.input_select(
                         "risk_level",
                         "⚖️ Risk Level",
-                        ["Low", "Medium", "High"]
+                        ["Low", "Medium", "High"],
                     ),
-
                     ui.tags.ul(
-                        ui.tags.li("Low – Fewer trades, wider thresholds, smaller position sizes, minimal leverage."),
+                        ui.tags.li(
+                            "Low – Fewer trades, wider thresholds, smaller position sizes, minimal leverage."
+                        ),
                         ui.tags.li("Medium – Balanced trade frequency and leverage."),
-                        ui.tags.li("High – More aggressive signals, tighter thresholds, higher leverage and drawdown."),
-                        style="color:#CCCCCC; font-size:14px; margin-top:4px;"
+                        ui.tags.li(
+                            "High – More aggressive signals, tighter thresholds, higher leverage and drawdown."
+                        ),
+                        style="color:#CCCCCC; font-size:14px; margin-top:4px;",
                     ),
-
                     ui.hr(),
-
                     # -------------------------------------
                     # Section 2 — Z-score Explanation
                     # -------------------------------------
-                    ui.h4("📊 2. Understanding Z-score (Core Signal)",
-                          style="color:#00E6A8; margin-top:10px;"),
-
-                    ui.p(
-                        "The Z-score measures how far the current price spread deviates from its historical average. "
-                        "It standardizes spread movements to detect statistically abnormal divergence.",
-                        style="color:#CCCCCC; margin-bottom:10px;"
+                    ui.h4(
+                        "📊 2. Understanding Z-score for Pairs Trading",
+                        style="color:#00E6A8; margin-top:10px;",
                     ),
-
+                    ui.p(
+                        "For pairs trading, the Z-score measures how far the current price spread deviates from its "
+                        "historical average. It standardizes spread movements to detect statistically abnormal divergence.",
+                        style="color:#CCCCCC; margin-bottom:10px;",
+                    ),
                     ui.tags.ul(
-                        ui.tags.li("Z > 2 → Spread unusually wide → Short overpriced asset, long underpriced asset."),
-                        ui.tags.li("Z < -2 → Spread unusually tight → Long overpriced asset, short underpriced asset."),
-                        ui.tags.li("Higher-risk profiles use smaller Z-thresholds for more frequent signals."),
-                        style="color:#CCCCCC; font-size:14px;"
+                        ui.tags.li(
+                            "Z > 2 → Spread unusually wide → Short overpriced asset, long underpriced asset."
+                        ),
+                        ui.tags.li(
+                            "Z < -2 → Spread unusually tight → Long overpriced asset, short underpriced asset."
+                        ),
+                        ui.tags.li(
+                            "Higher-risk profiles use smaller Z-thresholds for more frequent signals."
+                        ),
+                        style="color:#CCCCCC; font-size:14px;",
                     ),
-
                     ui.p(
-                        "Z-score defines when to enter and exit trades. Your selected risk level changes how sensitive these thresholds are.",
-                        style="color:#AAAAAA; margin-top:6px; margin-bottom:18px;"
+                        "If cointegration fails, the engine can switch to a momentum model based on the A/B price ratio "
+                        "instead of Z-scores.",
+                        style="color:#AAAAAA; margin-top:6px; margin-bottom:18px;",
                     ),
-
                     ui.hr(),
-
                     # -------------------------------------
                     # Button
                     # -------------------------------------
@@ -335,32 +343,24 @@ def make_strategy_panel() -> ui.nav_panel:
                         "generate_strategy",
                         "🚀 Generate Strategy",
                         class_="btn btn-success btn-lg",
-                        style="margin-top:10px; margin-bottom:15px;"
+                        style="margin-top:10px; margin-bottom:15px;",
                     ),
-
                     ui.hr(),
-
                     # -------------------------------------
                     # Section 3 — Recommended Strategy Output
                     # -------------------------------------
-                    ui.h4("📘 Recommended Strategy",
-                          style="color:#00E6A8; margin-top:5px;"),
-
+                    ui.h4("📘 Recommended Strategy", style="color:#00E6A8; margin-top:5px;"),
                     ui.p(
-                        "Based on your inputs, the model generates recommended allocations, entry/exit thresholds, "
-                        "expected trade behaviour, and a rationale for how the strategy adapts to your profile.",
-                        style="color:#CCCCCC; margin-bottom:12px;"
+                        "Based on your inputs, the model generates recommended allocations, entry/exit triggers "
+                        "(for pairs trading), expected trade behaviour, and a rationale for how the strategy adapts "
+                        "to your profile.",
+                        style="color:#CCCCCC; margin-bottom:12px;",
                     ),
-
-                    # Dynamic text returned by server
                     ui.div(
                         ui.output_text_verbatim("strategy_output"),
-                        style="white-space:pre-line; color:#CCCCCC; margin-bottom:12px;"
+                        style="white-space:pre-line; color:#CCCCCC; margin-bottom:12px;",
                     ),
-
-                    # Chart
                     output_widget("strategy_chart"),
-
                 ),
             )
         ),
@@ -376,23 +376,20 @@ def make_about_panel() -> ui.nav_panel:
                 ui.card(
                     {"style": "max-width: 900px; margin: 0 auto; padding: 30px;"},
                     ui.h3("About HedgeHub", style="color:#00E6A8; text-align:center;"),
-
                     ui.p(
                         "HedgeHub is a smart pairs trading analytics platform built by Duke FinTech students. "
                         "It provides an intuitive, data-driven interface for exploring price relationships, testing "
                         "cointegration, analyzing spreads, and generating market-neutral trading insights.",
                         style="color:#CCCCCC; text-align:center;",
                     ),
-
                     ui.p(
                         "Pairs trading identifies two historically related assets whose price spread temporarily diverges. "
-                        "When this spread reaches statistically extreme levels, a long/short strategy may profit from mean reversion. "
-                        "HedgeHub helps users visualize these dynamics and evaluate strategy performance in an accessible way.",
+                        "When this spread reaches statistically extreme levels, a long/short strategy may profit from "
+                        "convergence. HedgeHub helps users visualize these dynamics and evaluate strategy performance "
+                        "in an accessible way.",
                         style="color:#CCCCCC; text-align:center;",
                     ),
-
                     ui.hr(),
-
                     ui.h4("Team", style="color:#00E6A8; text-align:center;"),
                     ui.div(
                         {"style": "text-align:center; line-height: 1.8; color:#CCCCCC;"},
@@ -400,14 +397,11 @@ def make_about_panel() -> ui.nav_panel:
                         ui.p("Celia Du — Email: xd90@duke.edu"),
                         ui.p("Zifei Yang — Email: zy204@duke.edu"),
                     ),
-
                     ui.hr(),
-
                     ui.p(
                         "This platform is for educational and research purposes only and does not constitute financial advice.",
                         style="color:#CCCCCC; text-align:center; font-size:0.9rem; opacity:0.8;",
                     ),
-
                     ui.p(
                         "© 2025 HedgeHub Analytics",
                         class_="text-center",
@@ -527,20 +521,32 @@ def server(input, output, session):
 
     def _info_row(label: str, value: str):
         return ui.tags.div(
-            ui.tags.span(label, style="color:#7EE1C3; font-size:0.9rem; letter-spacing:0.04em;"),
-            ui.tags.span(value, style="color:#FFFFFF; font-weight:600; font-size:1rem;"),
+            ui.tags.span(
+                label,
+                style="color:#7EE1C3; font-size:0.9rem; letter-spacing:0.04em;",
+            ),
+            ui.tags.span(
+                value,
+                style="color:#FFFFFF; font-weight:600; font-size:1rem;",
+            ),
             style=(
                 "display:flex; justify-content:space-between; align-items:center;"
                 "padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.07);"
             ),
         )
-        
+
     def _stat_chip(label: str, value: str, accent: str = "#00E6A8"):
         return ui.tags.div(
-            ui.tags.small(label.upper(), style="color:rgba(255,255,255,0.65); letter-spacing:0.08em;"),
+            ui.tags.small(
+                label.upper(),
+                style="color:rgba(255,255,255,0.65); letter-spacing:0.08em;",
+            ),
             ui.tags.span(
                 value,
-                style=f"color:#FFFFFF; font-weight:600; font-size:1.05rem; text-shadow:0 0 8px {accent};",
+                style=(
+                    "color:#FFFFFF; font-weight:600; font-size:1.05rem; "
+                    f"text-shadow:0 0 8px {accent};"
+                ),
             ),
             style=(
                 "min-width:160px; padding:12px 16px; border-radius:14px;"
@@ -548,22 +554,24 @@ def server(input, output, session):
                 "box-shadow:0 10px 30px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:6px;"
             ),
         )
-        # ----------------------------------------------------
-    # Position Sizing: Compute Long/Short shares
-    # ----------------------------------------------------
 
-    def _build_strategy_modal(plan: StrategyPlan, has_pair_data: bool, ticker_a: str, ticker_b: str) -> ui.modal:
+    def _build_strategy_modal(
+        plan: StrategyPlan,
+        has_pair_data: bool,
+        ticker_a: str,
+        ticker_b: str,
+        model: str | None = None,
+    ) -> ui.modal:
+        mode = (model or "").lower()
+        is_momentum = mode == "momentum"
 
-
-    # ----------------------------------------------------
-    # NEW: Compute Position Sizing (must be BEFORE modal UI)
-    # ----------------------------------------------------
+        # ---------- Position sizing ----------
         pos = None
         try:
-            if has_pair_data and plan.prices is not None:
+            if has_pair_data and plan.prices is not None and plan.hedge_ratio is not None:
                 pos = compute_positions(
                     prices=plan.prices,
-                    hedge_ratio=plan.hedge_ratio,
+                    hedge_ratio=plan.hedge_ratio or 1.0,
                     invest_amount=plan.suggested_notional,
                     signal=plan.signal_type,
                 )
@@ -571,41 +579,58 @@ def server(input, output, session):
             print("Position sizing error:", e)
             pos = None
 
-        # ----------------------------------------------------
-        # Resolve entry/exit Z-score labels
-        # ----------------------------------------------------
-        entry_label, exit_label = _resolve_entry_exit(plan)
-
         snapshot_note = (
-            "Run Pair Analysis to refresh live spread inputs."
+            "Run Pair Analysis to refresh live spread/ratio inputs."
             if not has_pair_data
             else ""
         )
 
-        # ----------------------------------------------------
-        # Signal Section UI
-        # ----------------------------------------------------
-        signal_section = ui.div(
-            {
-                "style": "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
-                "border:1px solid rgba(0,230,168,0.25); border-radius:18px; padding:20px; min-width:280px;"
-            },
-            ui.tags.span(
-                "Signal Card",
-                style="color:#00E6A8; font-weight:600; letter-spacing:0.08em; font-size:0.85rem;",
-            ),
-            ui.h4(plan.signal_type, style="color:#FFFFFF; margin:6px 0 18px 0;"),
-            _info_row("Rationale", plan.rationale),
-            _info_row("Entry Trigger", entry_label),
-            _info_row("Exit Trigger", exit_label),
-        )
+        # ---------- Signal Section ----------
+        header_label = "Momentum Signal" if is_momentum else "Pairs Trading Signal"
 
-        # ----------------------------------------------------
-        # Snapshot Section UI
-        # ----------------------------------------------------
+        if is_momentum:
+            signal_section = ui.div(
+                {
+                    "style": (
+                        "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
+                        "border:1px solid rgba(0,230,168,0.25); border-radius:18px; padding:20px; min-width:280px;"
+                    )
+                },
+                ui.tags.span(
+                    header_label,
+                    style=(
+                        "color:#00E6A8; font-weight:600; letter-spacing:0.08em; font-size:0.85rem;"
+                    ),
+                ),
+                ui.h4(plan.signal_type, style="color:#FFFFFF; margin:6px 0 18px 0;"),
+                _info_row("Rationale", plan.rationale),
+            )
+        else:
+            entry_label, exit_label = _resolve_entry_exit(plan)
+            signal_section = ui.div(
+                {
+                    "style": (
+                        "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
+                        "border:1px solid rgba(0,230,168,0.25); border-radius:18px; padding:20px; min-width:280px;"
+                    )
+                },
+                ui.tags.span(
+                    header_label,
+                    style=(
+                        "color:#00E6A8; font-weight:600; letter-spacing:0.08em; font-size:0.85rem;"
+                    ),
+                ),
+                ui.h4(plan.signal_type, style="color:#FFFFFF; margin:6px 0 18px 0;"),
+                _info_row("Rationale", plan.rationale),
+                _info_row("Entry Trigger", entry_label),
+                _info_row("Exit Trigger", exit_label),
+            )
+
+        # ---------- Snapshot Section ----------
+        spread_label = "Price Ratio (A/B)" if is_momentum else "Spread"
         snapshot_children = [
             ui.h5("Market Snapshot", style="color:#00E6A8; margin-bottom:10px;"),
-            _info_row("Spread", f"{plan.spread_value:.2f}"),
+            _info_row(spread_label, f"{plan.spread_value:.4f}"),
             _info_row("Z-score", _format_z(plan.zscore_value)),
         ]
 
@@ -619,37 +644,38 @@ def server(input, output, session):
 
         snapshot_section = ui.div(
             {
-                "style": "flex:1 1 320px; background:rgba(255,255,255,0.04);"
-                "border:1px solid rgba(255,255,255,0.15); border-radius:18px; padding:20px; min-width:280px;"
+                "style": (
+                    "flex:1 1 320px; background:rgba(255,255,255,0.04);"
+                    "border:1px solid rgba(255,255,255,0.15); border-radius:18px; padding:20px; min-width:280px;"
+                )
             },
             *snapshot_children,
         )
 
-        # ----------------------------------------------------
-        # Chips UI
-        # ----------------------------------------------------
+        # ---------- Header Chips ----------
+        title_label = "Momentum Strategy" if is_momentum else "Pairs Trading Strategy"
         chips = ui.tags.div(
-            {
-                "style": "display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px;"
-            },
+            {"style": "display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px;"},
+            _stat_chip("Mode", title_label),
             _stat_chip("Risk", plan.risk_level),
             _stat_chip("Allocation", f"{plan.allocation_pct*100:.0f}%"),
             _stat_chip("Deploy", format_currency(plan.suggested_notional)),
         )
 
-        # ----------------------------------------------------
-        # Position Recommendation Section
-        # ----------------------------------------------------
-        position_section = ui.div(
-            {
-                "style": (
-                    "margin-top:22px; padding:20px; border-radius:16px;"
-                    "background:rgba(0,230,168,0.08); border:1px solid rgba(0,230,168,0.25);"
-                )
-            },
-            ui.h4("Position Recommendation", style="color:#00E6A8; margin-bottom:10px;"),
-            (
-                ui.div(
+        # ---------- Position Recommendation ----------
+        signal_lower = (plan.signal_type or "").lower()
+
+        def _has_directional_signal() -> bool:
+            return signal_lower.startswith("long") or signal_lower.startswith("short")
+
+        if is_momentum:
+            if (
+                _has_directional_signal()
+                and pos is not None
+                and pos.get("long_ticker")
+                and pos.get("short_ticker")
+            ):
+                position_body = ui.div(
                     ui.p(
                         f"Long {pos['long_shares']} shares of {pos['long_ticker']} "
                         f"(≈{format_currency(pos['long_amount'])})",
@@ -661,23 +687,66 @@ def server(input, output, session):
                         style="color:#FF9999; margin:0;",
                     ),
                 )
-                if pos is not None
-                else ui.p(
-                    "Run Pair Analysis to unlock long/short position sizing.",
+            elif not _has_directional_signal():
+                position_body = ui.p(
+                    "The momentum model does not currently recommend opening a position. "
+                    "Wait for the price ratio to break above/below its thresholds.",
                     style="color:#AAAAAA;",
                 )
-            ),
+            else:
+                position_body = ui.p(
+                    "Unable to compute momentum position sizing due to missing price data.",
+                    style="color:#AAAAAA;",
+                )
+        else:
+            if (
+                pos is not None
+                and pos.get("long_ticker")
+                and pos.get("short_ticker")
+            ):
+                position_body = ui.div(
+                    ui.p(
+                        f"Long {pos['long_shares']} shares of {pos['long_ticker']} "
+                        f"(≈{format_currency(pos['long_amount'])})",
+                        style="color:#FFFFFF; margin:0;",
+                    ),
+                    ui.p(
+                        f"Short {pos['short_shares']} shares of {pos['short_ticker']} "
+                        f"(≈{format_currency(pos['short_amount'])})",
+                        style="color:#FF9999; margin:0;",
+                    ),
+                )
+            else:
+                position_body = ui.p(
+                    "Run Pair Analysis with a valid cointegrated pair to unlock pairs-trading position sizing.",
+                    style="color:#AAAAAA;",
+                )
+
+        position_section = ui.div(
+            {
+                "style": (
+                    "margin-top:22px; padding:20px; border-radius:16px;"
+                    "background:rgba(0,230,168,0.08); border:1px solid rgba(0,230,168,0.25);"
+                )
+            },
+            ui.h4("Position Recommendation", style="color:#00E6A8; margin-bottom:10px;"),
+            position_body,
         )
 
-        # ----------------------------------------------------
-        # RETURN THE MODAL
-        # ----------------------------------------------------
+        modal_title = (
+            "Momentum Strategy Recommendation"
+            if is_momentum
+            else "Pairs Trading Strategy Recommendation"
+        )
+
         return ui.modal(
             ui.div(
                 {
-                    "style": "background:linear-gradient(145deg, rgba(15,26,26,0.95), rgba(6,46,46,0.92));"
-                    "border-radius:22px; padding:10px; border:1px solid rgba(255,255,255,0.04);"
-                    "box-shadow:0 25px 50px rgba(0,0,0,0.55);"
+                    "style": (
+                        "background:linear-gradient(145deg, rgba(15,26,26,0.95), rgba(6,46,46,0.92));"
+                        "border-radius:22px; padding:10px; border:1px solid rgba(255,255,255,0.04);"
+                        "box-shadow:0 25px 50px rgba(0,0,0,0.55);"
+                    )
                 },
                 ui.div(
                     {
@@ -689,15 +758,16 @@ def server(input, output, session):
                         signal_section,
                         snapshot_section,
                     ),
-                    position_section,   # ← YOUR NEW SECTION HERE
+                    position_section,
                 ),
             ),
-            title="Strategy Recommendation",
+            title=modal_title,
             easy_close=True,
             size="m",
         )
 
-    
+    # -------------------- REACTIVE EFFECTS --------------------
+
     @reactive.effect
     @reactive.event(input.go_to_analysis)
     def _handle_home_cta():
@@ -717,7 +787,6 @@ def server(input, output, session):
         ticker_b = _clean_ticker_label(input.stock_b(), "ASSET B")
         pair_data = analysis_result.get()
 
-        # generate plan
         plan = generate_strategy_plan(
             amount=amount,
             risk_level=risk_choice,
@@ -727,17 +796,17 @@ def server(input, output, session):
         )
         strategy_plan.set(plan)
 
-        # show modal → must pass ticker_a and ticker_b
+        mode = getattr(pair_data, "mode", None) if pair_data is not None else None
+
         ui.modal_show(
             _build_strategy_modal(
                 plan=plan,
                 has_pair_data=pair_data is not None,
                 ticker_a=ticker_a,
                 ticker_b=ticker_b,
+                model=mode,
             )
         )
-
-
 
     @reactive.effect
     @reactive.event(input.run_analysis)
@@ -762,9 +831,71 @@ def server(input, output, session):
         except Exception as err:
             analysis_result.set(None)
             analysis_error.set(f"Error: {err}")
-        else:
-            analysis_result.set(result)
-            analysis_error.set("")
+            return
+
+        analysis_result.set(result)
+        analysis_error.set("")
+
+        # Cointegration 未通过 → 弹出使用 momentum 的提示
+        if not result.pair_ok:
+            ui.modal_show(
+                ui.modal(
+                    ui.div(
+                        ui.h4(
+                            "Pair Not Suitable for Pairs Trading",
+                            style="color:#FFB347; margin-bottom:10px;",
+                        ),
+                        ui.p(
+                            f"ADF p-value = {result.coint_pvalue:.3f}. "
+                            "This pair does not show a stable spread suitable for pairs trading.",
+                            style="color:#CCCCCC; margin-bottom:12px;",
+                        ),
+                        ui.p(
+                            "You can still analyze this pair using a momentum ratio model based on the A/B price ratio.",
+                            style="color:#AAAAAA; margin-bottom:16px;",
+                        ),
+                        ui.input_action_button(
+                            "use_momentum_model",
+                            "Use Momentum Model",
+                            class_="btn btn-success",
+                        ),
+                        style="padding:10px;",
+                    ),
+                    title="Cointegration Failed",
+                    easy_close=True,
+                    size="m",
+                )
+            )
+
+    @reactive.effect
+    @reactive.event(input.use_momentum_model)
+    def _use_momentum_model():
+        ticker_a = (input.stock_a() or "").strip().upper()
+        ticker_b = (input.stock_b() or "").strip().upper()
+        date_range = input.date_range()
+
+        if not ticker_a or not ticker_b or not date_range:
+            return
+
+        start, end = date_range
+        try:
+            m_result = analyze_pair_momentum(
+                ticker_a=ticker_a,
+                ticker_b=ticker_b,
+                start=str(start),
+                end=str(end),
+            )
+        except Exception as err:
+            analysis_error.set(f"Error (momentum): {err}")
+            return
+
+        analysis_result.set(m_result)
+        analysis_error.set(
+            "Using momentum ratio model (cointegration failed). "
+            "Strategy suggestions will be based on price ratio breaks."
+        )
+
+    # -------------------- RENDER FUNCTIONS --------------------
 
     @render.text
     def pair_test_result():
@@ -788,8 +919,11 @@ def server(input, output, session):
         result = analysis_result.get()
         metrics = result.performance if result else None
 
+        # momentum 没有回测 → 显示默认表
         if result is None or metrics is None:
-            waiting_note = analysis_error.get() or f"Waiting for trades from {pair_label}"
+            waiting_note = (
+                analysis_error.get() or f"Waiting for trades from {pair_label}"
+            )
             data = [
                 {
                     "Metric": "Initial Capital",
@@ -809,27 +943,27 @@ def server(input, output, session):
                 {
                     "Metric": "Total Return",
                     "Value": "0.00%",
-                    "Notes": "Calculated after live backtest",
+                    "Notes": "Calculated after spread-based backtest",
                 },
                 {
                     "Metric": "Annualized Return",
                     "Value": "0.00%",
-                    "Notes": "Calculated after live backtest",
+                    "Notes": "Calculated after spread-based backtest",
                 },
                 {
                     "Metric": "Annualized Volatility",
                     "Value": "0.00%",
-                    "Notes": "Calculated after live backtest",
+                    "Notes": "Calculated after spread-based backtest",
                 },
                 {
                     "Metric": "Sharpe Ratio",
                     "Value": "0.00",
-                    "Notes": "Calculated after live backtest",
+                    "Notes": "Calculated after spread-based backtest",
                 },
                 {
                     "Metric": "Max Drawdown",
                     "Value": "0.00%",
-                    "Notes": "Calculated after live backtest",
+                    "Notes": "Calculated after spread-based backtest",
                 },
                 {
                     "Metric": "Total Trades",
@@ -885,7 +1019,7 @@ def server(input, output, session):
             {
                 "Metric": "Total Trades",
                 "Value": str(metrics.total_trades),
-                "Notes": f"Entries generated by z-score triggers for {pair_label}",
+                "Notes": f"Entries generated by spread triggers for {pair_label}",
             },
         ]
         return pd.DataFrame(data)
@@ -966,13 +1100,18 @@ def server(input, output, session):
             )
 
         allocation_pct = plan.allocation_pct * 100
-        return (
+        text = (
             f"{plan.signal_type} — Risk {plan.risk_level}. "
             f"Allocate ≈{format_currency(plan.suggested_notional)} "
             f"({allocation_pct:.0f}% of capital). "
-            f"Entry {plan.entry_z:.2f} Z / Exit {plan.exit_z:.2f} Z."
         )
-        
+
+        # momentum 模型不显示 entry/exit
+        if plan.entry_z is not None and plan.exit_z is not None:
+            text += f"Entry {plan.entry_z:.2f} Z / Exit {plan.exit_z:.2f} Z."
+
+        return text
+
     @render_widget
     def strategy_chart():
         plan = strategy_plan.get()
@@ -995,7 +1134,7 @@ def server(input, output, session):
                 value *= 1 + drift + oscillation
                 balances.append(value)
             df = pd.DataFrame({"day": days, "balance": balances})
-            
+
         fig = px.line(df, x="day", y="balance")
         fig.update_traces(line_color="#00E6A8")
         fig.update_layout(
