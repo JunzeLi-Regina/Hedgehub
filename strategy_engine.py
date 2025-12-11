@@ -47,6 +47,84 @@ class PairResult:
     exit_z: float | None = None
 
 
+@dataclass
+class StrategyPlan:
+    risk_level: str
+    signal_type: str
+    rationale: str
+    entry_z: float
+    exit_z: float
+    spread_value: float
+    zscore_value: float
+    allocation_pct: float
+    suggested_notional: float
+
+
+_RISK_PRESETS: dict[str, dict[str, float]] = {
+    "LOW": {"entry_z": 2.5, "exit_z": 0.75, "allocation_pct": 0.35},
+    "MEDIUM": {"entry_z": 2.0, "exit_z": 0.5, "allocation_pct": 0.5},
+    "HIGH": {"entry_z": 1.5, "exit_z": 0.35, "allocation_pct": 0.65},
+}
+
+
+def generate_strategy_plan(
+    amount: float,
+    risk_level: str,
+    pair_result: PairResult | None = None,
+    ticker_a: str | None = None,
+    ticker_b: str | None = None,
+) -> StrategyPlan:
+    """Create simple strategy guidance based on risk appetite and latest spread stats."""
+
+    def _clean_label(label: str | None, fallback: str) -> str:
+        if not label:
+            return fallback
+        stripped = label.strip()
+        return stripped.upper() if stripped else fallback
+
+    label_a = _clean_label(ticker_a, "ASSET A")
+    label_b = _clean_label(ticker_b, "ASSET B")
+
+    preset_key = (risk_level or "MEDIUM").strip().upper()
+    preset = _RISK_PRESETS.get(preset_key, _RISK_PRESETS["MEDIUM"])
+
+    entry_z = float(preset["entry_z"])
+    exit_z = float(preset["exit_z"])
+    allocation_pct = float(preset["allocation_pct"])
+    
+    spread_value = 0.0
+    zscore_value = 0.0
+    rationale = "Configure Pair Analysis to unlock live spread context."
+
+    if pair_result is not None:
+        spread_value = float(pair_result.last_spread)
+        zscore_value = float(pair_result.last_zscore)
+        rationale = "Spread deviation versus long-term equilibrium."
+
+    signal_type = "Wait for Entry"
+    if zscore_value >= entry_z:
+        signal_type = f"Short {label_a} Long {label_b}"
+    elif zscore_value <= -entry_z:
+        signal_type = f"Long {label_a} Short {label_b}"
+    elif pair_result is None:
+        signal_type = "Await Analysis"
+
+    sanitized_amount = max(0.0, float(amount or 0.0))
+    suggested_notional = sanitized_amount * allocation_pct
+
+    return StrategyPlan(
+        risk_level=preset_key.title(),
+        signal_type=signal_type,
+        rationale=rationale,
+        entry_z=entry_z,
+        exit_z=exit_z,
+        spread_value=spread_value,
+        zscore_value=zscore_value,
+        allocation_pct=allocation_pct,
+        suggested_notional=suggested_notional,
+    )
+
+
 # ---------------------------------------------------------
 # Mean-reversion backtest on spread
 # ---------------------------------------------------------

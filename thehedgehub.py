@@ -3,7 +3,7 @@ from shinywidgets import output_widget, render_widget
 import pandas as pd
 import plotly.express as px
 
-from strategy_engine import analyze_pair
+from strategy_engine import analyze_pair, generate_strategy_plan, StrategyPlan
 
 NAVBAR_ID = "main_nav"
 
@@ -494,7 +494,143 @@ def server(input, output, session):
     analysis_error = reactive.Value(
         "Enter stock tickers and a date range, then click Run Pair Test."
     )
+    strategy_plan = reactive.Value(None)
 
+    def _clean_ticker_label(value: str | None, fallback: str) -> str:
+        label = (value or "").strip().upper()
+        return label if label else fallback
+
+    def _format_z(value: float) -> str:
+        return f"{value:+.2f} Z"
+
+    def _resolve_entry_exit(plan: StrategyPlan) -> tuple[str, str]:
+        lower_signal = plan.signal_type.lower()
+        entry = plan.entry_z
+        exit_value = plan.exit_z
+
+        if lower_signal.startswith("long"):
+            entry = -abs(entry)
+            exit_value = abs(exit_value)
+        elif lower_signal.startswith("short"):
+            entry = abs(entry)
+            exit_value = -abs(exit_value)
+        else:
+            entry = plan.entry_z
+            exit_value = plan.exit_z
+
+        return _format_z(entry), _format_z(exit_value)
+
+    def _info_row(label: str, value: str):
+        return ui.tags.div(
+            ui.tags.span(label, style="color:#7EE1C3; font-size:0.9rem; letter-spacing:0.04em;"),
+            ui.tags.span(value, style="color:#FFFFFF; font-weight:600; font-size:1rem;"),
+            style=(
+                "display:flex; justify-content:space-between; align-items:center;"
+                "padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.07);"
+            ),
+        )
+        
+    def _stat_chip(label: str, value: str, accent: str = "#00E6A8"):
+        return ui.tags.div(
+            ui.tags.small(label.upper(), style="color:rgba(255,255,255,0.65); letter-spacing:0.08em;"),
+            ui.tags.span(
+                value,
+                style=f"color:#FFFFFF; font-weight:600; font-size:1.05rem; text-shadow:0 0 8px {accent};",
+            ),
+            style=(
+                "min-width:160px; padding:12px 16px; border-radius:14px;"
+                "background:rgba(15,26,26,0.85); border:1px solid rgba(255,255,255,0.08);"
+                "box-shadow:0 10px 30px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:6px;"
+            ),
+        )
+
+    def _build_strategy_modal(plan: StrategyPlan, has_pair_data: bool) -> ui.modal:
+        entry_label, exit_label = _resolve_entry_exit(plan)
+        snapshot_note = (
+            "Run Pair Analysis to refresh live spread inputs."
+            if not has_pair_data
+            else ""
+        )
+
+        signal_section = ui.div(
+            {
+                "style": "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
+                "border:1px solid rgba(0,230,168,0.25); border-radius:18px; padding:20px; min-width:280px;"
+            },
+            ui.tags.span(
+                "Signal Card",
+                style="color:#00E6A8; font-weight:600; letter-spacing:0.08em; font-size:0.85rem;",
+            ),
+            ui.h4(plan.signal_type, style="color:#FFFFFF; margin:6px 0 18px 0;"),
+            _info_row("Rationale", plan.rationale),
+            _info_row("Entry Trigger", entry_label),
+            _info_row("Exit Trigger", exit_label),
+        )
+
+        snapshot_children = [
+            ui.h5("Market Snapshot", style="color:#00E6A8; margin-bottom:10px;"),
+            _info_row("Spread", f"{plan.spread_value:.2f}"),
+            _info_row("Z-score", _format_z(plan.zscore_value)),
+        ]   
+        
+        if snapshot_note:
+            snapshot_children.append(
+                ui.tags.small(
+                    snapshot_note,
+                    style="color:#AAAAAA; display:block; margin-top:6px;",
+                )
+            )
+
+        snapshot_section = ui.div(
+            {
+                "style": "flex:1 1 320px; background:rgba(255,255,255,0.04);"
+                "border:1px solid rgba(255,255,255,0.15); border-radius:18px; padding:20px; min-width:280px;"
+            },
+            *snapshot_children,
+        )
+
+        chips = ui.tags.div(
+            {
+                "style": "display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px;"
+            },
+            _stat_chip("Risk", plan.risk_level),
+            _stat_chip("Allocation", f"{plan.allocation_pct*100:.0f}%"),
+            _stat_chip("Deploy", format_currency(plan.suggested_notional)),
+        )
+
+        footer = ui.tags.div(
+            ui.tags.span(
+                f"Deploy ≈{format_currency(plan.suggested_notional)} "
+                f"({plan.allocation_pct * 100:.0f}% of capital)",
+                style="color:#CCCCCC; font-size:0.95rem;",
+            )
+        )
+        
+        return ui.modal(
+            ui.div(
+                {
+                    "style": "background:linear-gradient(145deg, rgba(15,26,26,0.95), rgba(6,46,46,0.92));"
+                    "border-radius:22px; padding:10px; border:1px solid rgba(255,255,255,0.04);"
+                    "box-shadow:0 25px 50px rgba(0,0,0,0.55);"
+                },
+                ui.div(
+                    {
+                        "style": "background:rgba(0,0,0,0.2); border-radius:18px; padding:24px;"
+                    },
+                    chips,
+                    ui.tags.div(
+                        {"style": "display:flex; flex-wrap:wrap; gap:20px;"},
+                        signal_section,
+                        snapshot_section,
+                    ),
+                ),
+            ),
+            title="Strategy Recommendation",
+            easy_close=True,
+            footer=footer,
+            size="m",
+        )
+        
     @reactive.effect
     @reactive.event(input.go_to_analysis)
     def _handle_home_cta():
@@ -504,6 +640,26 @@ def server(input, output, session):
             session=session,
         )
 
+    @reactive.effect
+    @reactive.event(input.generate_strategy)
+    def _handle_strategy_generation():
+        amount = float(input.investment_amount() or 0.0)
+        risk_choice = input.risk_level() or "Medium"
+        ticker_a = _clean_ticker_label(input.stock_a(), "ASSET A")
+        ticker_b = _clean_ticker_label(input.stock_b(), "ASSET B")
+        pair_data = analysis_result.get()
+
+        plan = generate_strategy_plan(
+            amount=amount,
+            risk_level=risk_choice,
+            pair_result=pair_data,
+            ticker_a=ticker_a,
+            ticker_b=ticker_b,
+        )
+        strategy_plan.set(plan)
+
+        ui.modal_show(_build_strategy_modal(plan, has_pair_data=pair_data is not None))
+        
     @reactive.effect
     @reactive.event(input.run_analysis)
     def _run_pair_analysis():
@@ -721,13 +877,46 @@ def server(input, output, session):
 
     @render.text
     def strategy_output():
-        amt = input.investment_amount()
-        risk = input.risk_level()
-        return f"Suggested base allocation for ${amt} with risk level {risk}."
+        plan = strategy_plan.get()
+        if plan is None:
+            amt = format_currency(float(input.investment_amount() or 0.0))
+            risk = input.risk_level() or "Medium"
+            return (
+                f"Capital ready: {amt} | Risk level: {risk}. "
+                "Click Generate Strategy to unlock tailored guidance."
+            )
 
+        allocation_pct = plan.allocation_pct * 100
+        return (
+            f"{plan.signal_type} — Risk {plan.risk_level}. "
+            f"Allocate ≈{format_currency(plan.suggested_notional)} "
+            f"({allocation_pct:.0f}% of capital). "
+            f"Entry {plan.entry_z:.2f} Z / Exit {plan.exit_z:.2f} Z."
+        )
+        
     @render_widget
     def strategy_chart():
-        df = pd.DataFrame({"day": [1, 2, 3, 4], "balance": [100, 102, 104, 103]})
+        plan = strategy_plan.get()
+
+        if plan is None:
+            df = pd.DataFrame({"day": [1, 2, 3, 4], "balance": [100, 102, 104, 103]})
+        else:
+            drift_map = {"Low": 0.0005, "Medium": 0.0009, "High": 0.0013}
+            vol_map = {"Low": 0.0006, "Medium": 0.0011, "High": 0.0016}
+
+            drift = drift_map.get(plan.risk_level, 0.0008)
+            vol = vol_map.get(plan.risk_level, 0.0012)
+
+            base = max(plan.suggested_notional, 1.0)
+            days = list(range(1, 16))
+            balances = []
+            value = base
+            for idx, _ in enumerate(days):
+                oscillation = ((idx % 4) - 1.5) * vol
+                value *= 1 + drift + oscillation
+                balances.append(value)
+            df = pd.DataFrame({"day": days, "balance": balances})
+            
         fig = px.line(df, x="day", y="balance")
         fig.update_traces(line_color="#00E6A8")
         fig.update_layout(
