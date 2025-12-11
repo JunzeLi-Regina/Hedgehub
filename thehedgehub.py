@@ -522,9 +522,26 @@ def server(input, output, session):
 
     def _info_row(label: str, value: str):
         return ui.tags.div(
-            ui.tags.span(label, style="color:#00E6A8; font-weight:600;"),
-            ui.tags.span(value, style="color:#FFFFFF; font-weight:500;"),
-            style="display:flex; justify-content:space-between; margin-bottom:6px;",
+            ui.tags.span(label, style="color:#7EE1C3; font-size:0.9rem; letter-spacing:0.04em;"),
+            ui.tags.span(value, style="color:#FFFFFF; font-weight:600; font-size:1rem;"),
+            style=(
+                "display:flex; justify-content:space-between; align-items:center;"
+                "padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.07);"
+            ),
+        )
+
+    def _stat_chip(label: str, value: str, accent: str = "#00E6A8"):
+        return ui.tags.div(
+            ui.tags.small(label.upper(), style="color:rgba(255,255,255,0.65); letter-spacing:0.08em;"),
+            ui.tags.span(
+                value,
+                style=f"color:#FFFFFF; font-weight:600; font-size:1.05rem; text-shadow:0 0 8px {accent};",
+            ),
+            style=(
+                "min-width:160px; padding:12px 16px; border-radius:14px;"
+                "background:rgba(15,26,26,0.85); border:1px solid rgba(255,255,255,0.08);"
+                "box-shadow:0 10px 30px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:6px;"
+            ),
         )
 
     def _build_strategy_modal(plan: StrategyPlan, has_pair_data: bool) -> ui.modal:
@@ -537,15 +554,17 @@ def server(input, output, session):
 
         signal_section = ui.div(
             {
-                "style": "background-color:rgba(0,230,168,0.08);"
-                "border:1px solid rgba(0,230,168,0.25);"
-                "border-radius:14px; padding:18px; margin-bottom:18px;"
+                "style": "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
+                "border:1px solid rgba(0,230,168,0.25); border-radius:18px; padding:20px; min-width:280px;"
             },
-            ui.h5("Signal Card", style="color:#00E6A8; margin-bottom:10px;"),
-            _info_row("Type", plan.signal_type),
+            ui.tags.span(
+                "Signal Card",
+                style="color:#00E6A8; font-weight:600; letter-spacing:0.08em; font-size:0.85rem;",
+            ),
+            ui.h4(plan.signal_type, style="color:#FFFFFF; margin:6px 0 18px 0;"),
             _info_row("Rationale", plan.rationale),
-            _info_row("Entry", entry_label),
-            _info_row("Exit", exit_label),
+            _info_row("Entry Trigger", entry_label),
+            _info_row("Exit Trigger", exit_label),
         )
 
         snapshot_children = [
@@ -564,11 +583,19 @@ def server(input, output, session):
 
         snapshot_section = ui.div(
             {
-                "style": "background-color:rgba(255,255,255,0.04);"
-                "border:1px solid rgba(255,255,255,0.15);"
-                "border-radius:14px; padding:18px;"
+                "style": "flex:1 1 320px; background:rgba(255,255,255,0.04);"
+                "border:1px solid rgba(255,255,255,0.15); border-radius:18px; padding:20px; min-width:280px;"
             },
             *snapshot_children,
+        )
+
+        chips = ui.tags.div(
+            {
+                "style": "display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px;"
+            },
+            _stat_chip("Risk", plan.risk_level),
+            _stat_chip("Allocation", f"{plan.allocation_pct*100:.0f}%"),
+            _stat_chip("Deploy", format_currency(plan.suggested_notional)),
         )
 
         footer = ui.tags.div(
@@ -580,7 +607,24 @@ def server(input, output, session):
         )
 
         return ui.modal(
-            ui.div(signal_section, snapshot_section),
+            ui.div(
+                {
+                    "style": "background:linear-gradient(145deg, rgba(15,26,26,0.95), rgba(6,46,46,0.92));"
+                    "border-radius:22px; padding:10px; border:1px solid rgba(255,255,255,0.04);"
+                    "box-shadow:0 25px 50px rgba(0,0,0,0.55);"
+                },
+                ui.div(
+                    {
+                        "style": "background:rgba(0,0,0,0.2); border-radius:18px; padding:24px;"
+                    },
+                    chips,
+                    ui.tags.div(
+                        {"style": "display:flex; flex-wrap:wrap; gap:20px;"},
+                        signal_section,
+                        snapshot_section,
+                    ),
+                ),
+            ),
             title="Strategy Recommendation",
             easy_close=True,
             footer=footer,
