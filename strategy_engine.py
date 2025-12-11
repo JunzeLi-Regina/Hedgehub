@@ -9,6 +9,9 @@ import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller
 
 
+# ---------------------------------------------------------
+# Performance metrics for backtest
+# ---------------------------------------------------------
 @dataclass
 class PerformanceMetrics:
     initial_capital: float
@@ -21,17 +24,22 @@ class PerformanceMetrics:
     total_trades: int
 
 
+# ---------------------------------------------------------
+# Main return object for pair analysis
+# ---------------------------------------------------------
 @dataclass
 class PairResult:
-    pair_ok: bool
-    mode: str
-    signal: str
-    explanation: str
+    pair_ok: bool                      # Whether cointegration / mean reversion is valid
+    mode: str                          # "mean_reversion" or "momentum"
+    signal: str                        # Machine-friendly signal code
+    explanation: str                   # Human-readable strategy explanation
     hedge_ratio: float
     coint_pvalue: float
     last_spread: float
     last_zscore: float
     spread_series: pd.Series
+
+    # Extra fields used by UI
     prices: pd.DataFrame | None = None
     spread_zscores: pd.Series | None = None
     performance: PerformanceMetrics | None = None
@@ -39,6 +47,9 @@ class PairResult:
     exit_z: float | None = None
 
 
+# ---------------------------------------------------------
+# Mean-reversion backtest on spread
+# ---------------------------------------------------------
 def run_mean_reversion_backtest(
     price_frame: pd.DataFrame,
     beta: float,
@@ -76,14 +87,18 @@ def run_mean_reversion_backtest(
     for idx in range(1, rows):
         z = float(zscores.iloc[idx - 1])
 
+        # Exit when spread reverts into neutral zone
         if position != 0.0 and abs(z) <= exit_z:
             position = 0.0
 
+        # Open new position only when flat
         if position == 0.0:
             if z > entry_z:
+                # Spread too wide: short A, long B
                 position = -allocation
                 trades += 1
             elif z < -entry_z:
+                # Spread too tight: long A, short B
                 position = allocation
                 trades += 1
 
@@ -137,6 +152,9 @@ def run_mean_reversion_backtest(
     )
 
 
+# ---------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------
 def download_prices(ticker: str, start: str, end: str) -> pd.Series:
     data = yf.download(
         ticker,
@@ -161,6 +179,9 @@ def adf_test(series: pd.Series) -> float:
     return float(adfuller(series.values)[1])
 
 
+# ---------------------------------------------------------
+# Mean-reversion pair analysis (primary engine)
+# ---------------------------------------------------------
 def analyze_pair(
     ticker_a: str,
     ticker_b: str,
@@ -174,24 +195,30 @@ def analyze_pair(
 
     df = pd.concat([prices_a, prices_b], axis=1).dropna()
     df.columns = ["A", "B"]
+
+    # For plotting in UI, keep user-friendly tickers
     display_prices = df.rename(columns={"A": ticker_a.upper(), "B": ticker_b.upper()})
 
+    # Hedge ratio and spread
     beta = estimate_hedge_ratio(df["A"], df["B"])
     spread = df["A"] - beta * df["B"]
 
+    # Cointegration / mean-reversion test
     pvalue = adf_test(spread)
     pair_ok = pvalue < 0.05
 
     mean_spread = spread.mean()
     std_spread = spread.std(ddof=1)
-    last_spread = float(spread.iloc[-1])
-    z = (last_spread - mean_spread) / std_spread if std_spread > 0 else 0.0
 
+    last_spread = float(spread.iloc[-1])
     if std_spread > 0:
+        last_z = float((last_spread - mean_spread) / std_spread)
         zscores = (spread - mean_spread) / std_spread
     else:
+        last_z = 0.0
         zscores = pd.Series(0.0, index=spread.index)
 
+    # Always compute backtest once, so performance table can show something
     performance = run_mean_reversion_backtest(
         price_frame=df,
         beta=beta,
@@ -200,11 +227,12 @@ def analyze_pair(
         exit_z=exit_z,
     )
 
+    # If cointegration fails → no mean-reversion strategy
     if not pair_ok:
         explanation = (
-            f"Cointegration test result: fail (ADF p-value = {pvalue:.3f}). "
-            "The price relationship does not exhibit reliable mean-reverting behavior. "
-            "You may stop here or continue with a trend-based momentum signal instead."
+            f"Cointegration test failed (ADF p-value = {pvalue:.3f}). "
+            "The price relationship does not show stable mean reversion. "
+            "Mean-reversion pairs trading is not recommended for this pair."
         )
 
         return PairResult(
@@ -215,7 +243,7 @@ def analyze_pair(
             hedge_ratio=beta,
             coint_pvalue=pvalue,
             last_spread=last_spread,
-            last_zscore=z,
+            last_zscore=last_z,
             spread_series=spread,
             prices=display_prices,
             spread_zscores=zscores,
@@ -224,39 +252,37 @@ def analyze_pair(
             exit_z=exit_z,
         )
 
+    # Cointegration passes → construct entry/exit zones and signal
     entry_upper = mean_spread + entry_z * std_spread
     entry_lower = mean_spread - entry_z * std_spread
     exit_low = mean_spread - exit_z * std_spread
     exit_high = mean_spread + exit_z * std_spread
 
-    if z > entry_z:
+    if last_z > entry_z:
         signal = "short_A_long_B"
         explanation = (
-            f"The spread is above the upper entry threshold (z = {z:.2f}). "
+            f"Current z-score is {last_z:.2f}, above the entry threshold {entry_z:.2f}. "
             f"Suggested action: short {ticker_a} and long {ticker_b}. "
-            f"Exit if spread returns to the estimated neutral range: {exit_low:.2f} to {exit_high:.2f}."
+            f"Exit when the spread moves back into the neutral range between {exit_low:.4f} and {exit_high:.4f}."
         )
-
-    elif z < -entry_z:
+    elif last_z < -entry_z:
         signal = "long_A_short_B"
         explanation = (
-            f"The spread is below the lower entry threshold (z = {z:.2f}). "
+            f"Current z-score is {last_z:.2f}, below the entry threshold -{entry_z:.2f}. "
             f"Suggested action: long {ticker_a} and short {ticker_b}. "
-            f"Exit if spread normalizes back into the estimated neutral range: {exit_low:.2f} to {exit_high:.2f}."
+            f"Exit when the spread moves back into the neutral range between {exit_low:.4f} and {exit_high:.4f}."
         )
-
-    elif abs(z) <= exit_z:
+    elif abs(last_z) <= exit_z:
         signal = "close_positions"
         explanation = (
-            f"The spread has returned to the neutral zone (z = {z:.2f}). "
-            "Suggested action: close open positions."
+            f"Current z-score is {last_z:.2f}, inside the neutral exit band ±{exit_z:.2f}. "
+            "Suggested action: close existing positions and lock in profits or losses."
         )
-
     else:
         signal = "no_trade"
         explanation = (
-            f"No entry signal detected (current z = {z:.2f}). "
-            "Monitoring only; no new trade recommended at this stage."
+            f"Current z-score is {last_z:.2f}. "
+            "The spread is not at an extreme level, so no new trade is recommended."
         )
 
     return PairResult(
@@ -267,7 +293,7 @@ def analyze_pair(
         hedge_ratio=beta,
         coint_pvalue=pvalue,
         last_spread=last_spread,
-        last_zscore=z,
+        last_zscore=last_z,
         spread_series=spread,
         prices=display_prices,
         spread_zscores=zscores,
@@ -277,6 +303,9 @@ def analyze_pair(
     )
 
 
+# ---------------------------------------------------------
+# Momentum-based analysis (used only when user chooses)
+# ---------------------------------------------------------
 def analyze_pair_momentum(
     ticker_a: str,
     ticker_b: str,
@@ -302,23 +331,20 @@ def analyze_pair_momentum(
     if cur > high:
         signal = "momentum_buy_A_sell_B"
         explanation = (
-            f"The price ratio indicates upward momentum beyond the breakout level. "
-            f"Suggested action: buy {ticker_a} and sell {ticker_b}. "
-            f"Suggested protective stop at {stop_reference:.4f}."
-        )
-
+            "The price ratio A/B is above the upper breakout level, indicating upward momentum in A "
+            "relative to B. Suggested action: buy {a} and sell {b}. Suggested protective stop near ratio {stop:.4f}."
+        ).format(a=ticker_a, b=ticker_b, stop=stop_reference)
     elif cur < low:
         signal = "momentum_buy_B_sell_A"
         explanation = (
-            f"The price ratio indicates downward momentum below the lower threshold. "
-            f"Suggested action: buy {ticker_b} and sell {ticker_a}. "
-            f"Suggested protective stop at {stop_reference:.4f}."
-        )
-
+            "The price ratio A/B is below the lower threshold, indicating relative strength in {b} "
+            "and weakness in {a}. Suggested action: buy {b} and sell {a}. Suggested protective stop near ratio {stop:.4f}."
+        ).format(a=ticker_a, b=ticker_b, stop=stop_reference)
     else:
         signal = "hold_no_signal"
         explanation = (
-            "No strong directional momentum detected. No trade is suggested at this time."
+            "The price ratio A/B is within its typical range. No strong momentum signal is detected, "
+            "so no trade is suggested at this time."
         )
 
     return PairResult(
