@@ -3,7 +3,13 @@ from shinywidgets import output_widget, render_widget
 import pandas as pd
 import plotly.express as px
 
-from strategy_engine import analyze_pair, generate_strategy_plan, StrategyPlan
+from strategy_engine import (
+    analyze_pair,
+    generate_strategy_plan,
+    StrategyPlan,
+    compute_positions,
+)
+
 
 NAVBAR_ID = "main_nav"
 
@@ -47,7 +53,6 @@ def make_home_panel() -> ui.nav_panel:
                     ),
 
                     ui.hr(),
-
                     # ---------------- Feature Cards (MORE TEXT VERSION) ----------------
                     ui.div(
                         {
@@ -543,15 +548,43 @@ def server(input, output, session):
                 "box-shadow:0 10px 30px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:6px;"
             ),
         )
+        # ----------------------------------------------------
+    # Position Sizing: Compute Long/Short shares
+    # ----------------------------------------------------
 
-    def _build_strategy_modal(plan: StrategyPlan, has_pair_data: bool) -> ui.modal:
+    def _build_strategy_modal(plan: StrategyPlan, has_pair_data: bool, ticker_a: str, ticker_b: str) -> ui.modal:
+
+
+    # ----------------------------------------------------
+    # NEW: Compute Position Sizing (must be BEFORE modal UI)
+    # ----------------------------------------------------
+        pos = None
+        try:
+            if has_pair_data and plan.prices is not None:
+                pos = compute_positions(
+                    prices=plan.prices,
+                    hedge_ratio=plan.hedge_ratio,
+                    invest_amount=plan.suggested_notional,
+                    signal=plan.signal_type,
+                )
+        except Exception as e:
+            print("Position sizing error:", e)
+            pos = None
+
+        # ----------------------------------------------------
+        # Resolve entry/exit Z-score labels
+        # ----------------------------------------------------
         entry_label, exit_label = _resolve_entry_exit(plan)
+
         snapshot_note = (
             "Run Pair Analysis to refresh live spread inputs."
             if not has_pair_data
             else ""
         )
 
+        # ----------------------------------------------------
+        # Signal Section UI
+        # ----------------------------------------------------
         signal_section = ui.div(
             {
                 "style": "flex:1 1 320px; background:linear-gradient(135deg, rgba(0,230,168,0.18), rgba(6,46,46,0.8));"
@@ -567,12 +600,15 @@ def server(input, output, session):
             _info_row("Exit Trigger", exit_label),
         )
 
+        # ----------------------------------------------------
+        # Snapshot Section UI
+        # ----------------------------------------------------
         snapshot_children = [
             ui.h5("Market Snapshot", style="color:#00E6A8; margin-bottom:10px;"),
             _info_row("Spread", f"{plan.spread_value:.2f}"),
             _info_row("Z-score", _format_z(plan.zscore_value)),
-        ]   
-        
+        ]
+
         if snapshot_note:
             snapshot_children.append(
                 ui.tags.small(
@@ -589,6 +625,9 @@ def server(input, output, session):
             *snapshot_children,
         )
 
+        # ----------------------------------------------------
+        # Chips UI
+        # ----------------------------------------------------
         chips = ui.tags.div(
             {
                 "style": "display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px;"
@@ -598,14 +637,41 @@ def server(input, output, session):
             _stat_chip("Deploy", format_currency(plan.suggested_notional)),
         )
 
-        footer = ui.tags.div(
-            ui.tags.span(
-                f"Deploy ≈{format_currency(plan.suggested_notional)} "
-                f"({plan.allocation_pct * 100:.0f}% of capital)",
-                style="color:#CCCCCC; font-size:0.95rem;",
-            )
+        # ----------------------------------------------------
+        # Position Recommendation Section
+        # ----------------------------------------------------
+        position_section = ui.div(
+            {
+                "style": (
+                    "margin-top:22px; padding:20px; border-radius:16px;"
+                    "background:rgba(0,230,168,0.08); border:1px solid rgba(0,230,168,0.25);"
+                )
+            },
+            ui.h4("Position Recommendation", style="color:#00E6A8; margin-bottom:10px;"),
+            (
+                ui.div(
+                    ui.p(
+                        f"Long {pos['long_shares']} shares of {pos['long_ticker']} "
+                        f"(≈{format_currency(pos['long_amount'])})",
+                        style="color:#FFFFFF; margin:0;",
+                    ),
+                    ui.p(
+                        f"Short {pos['short_shares']} shares of {pos['short_ticker']} "
+                        f"(≈{format_currency(pos['short_amount'])})",
+                        style="color:#FF9999; margin:0;",
+                    ),
+                )
+                if pos is not None
+                else ui.p(
+                    "Run Pair Analysis to unlock long/short position sizing.",
+                    style="color:#AAAAAA;",
+                )
+            ),
         )
-        
+
+        # ----------------------------------------------------
+        # RETURN THE MODAL
+        # ----------------------------------------------------
         return ui.modal(
             ui.div(
                 {
@@ -623,14 +689,15 @@ def server(input, output, session):
                         signal_section,
                         snapshot_section,
                     ),
+                    position_section,   # ← YOUR NEW SECTION HERE
                 ),
             ),
             title="Strategy Recommendation",
             easy_close=True,
-            footer=footer,
             size="m",
         )
-        
+
+    
     @reactive.effect
     @reactive.event(input.go_to_analysis)
     def _handle_home_cta():
@@ -645,10 +712,12 @@ def server(input, output, session):
     def _handle_strategy_generation():
         amount = float(input.investment_amount() or 0.0)
         risk_choice = input.risk_level() or "Medium"
+
         ticker_a = _clean_ticker_label(input.stock_a(), "ASSET A")
         ticker_b = _clean_ticker_label(input.stock_b(), "ASSET B")
         pair_data = analysis_result.get()
 
+        # generate plan
         plan = generate_strategy_plan(
             amount=amount,
             risk_level=risk_choice,
@@ -658,8 +727,18 @@ def server(input, output, session):
         )
         strategy_plan.set(plan)
 
-        ui.modal_show(_build_strategy_modal(plan, has_pair_data=pair_data is not None))
-        
+        # show modal → must pass ticker_a and ticker_b
+        ui.modal_show(
+            _build_strategy_modal(
+                plan=plan,
+                has_pair_data=pair_data is not None,
+                ticker_a=ticker_a,
+                ticker_b=ticker_b,
+            )
+        )
+
+
+
     @reactive.effect
     @reactive.event(input.run_analysis)
     def _run_pair_analysis():

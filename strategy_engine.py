@@ -59,6 +59,87 @@ class StrategyPlan:
     allocation_pct: float
     suggested_notional: float
 
+    # 🔥 新增字段：用于 position sizing
+    prices: pd.DataFrame | None = None
+    hedge_ratio: float | None = None
+    ticker_a: str | None = None
+    ticker_b: str | None = None
+
+def compute_positions(
+    prices: pd.DataFrame,
+    hedge_ratio: float,
+    invest_amount: float,
+    signal: str,
+) -> dict:
+    """
+    自动识别列名，无论是 A/B 还是 AAPL/MSFT 都可以正常工作。
+    """
+
+    if prices is None or prices.empty:
+        return {
+            "long_ticker": "",
+            "short_ticker": "",
+            "long_shares": 0.0,
+            "short_shares": 0.0,
+            "long_amount": 0.0,
+            "short_amount": 0.0,
+            "price_a": 0.0,
+            "price_b": 0.0,
+        }
+
+    # ---- 自动获取列名 ----
+    cols = list(prices.columns)
+    if len(cols) < 2:
+        raise ValueError("Price DataFrame does not contain two assets")
+
+    col_a, col_b = cols[0], cols[1]
+
+    # 最新价格
+    price_a = float(prices[col_a].iloc[-1])
+    price_b = float(prices[col_b].iloc[-1])
+
+    if hedge_ratio <= 0:
+        hedge_ratio = 1.0
+
+    long_amount = invest_amount / (1 + hedge_ratio)
+    short_amount = invest_amount * hedge_ratio / (1 + hedge_ratio)
+
+    # ---- 根据 signal 决定多空方向 ----
+    if "Long" in signal and col_a in signal:
+        long_ticker, short_ticker = col_a, col_b
+        long_shares = long_amount / price_a
+        short_shares = short_amount / price_b
+
+    elif "Long" in signal and col_b in signal:
+        long_ticker, short_ticker = col_b, col_a
+        long_shares = long_amount / price_b
+        short_shares = short_amount / price_a
+
+    else:
+        return {
+            "long_ticker": "",
+            "short_ticker": "",
+            "long_shares": 0.0,
+            "short_shares": 0.0,
+            "long_amount": 0.0,
+            "short_amount": 0.0,
+            "price_a": price_a,
+            "price_b": price_b,
+        }
+
+    return {
+        "long_ticker": long_ticker,
+        "short_ticker": short_ticker,
+        "long_shares": round(long_shares, 2),
+        "short_shares": round(short_shares, 2),
+        "long_amount": round(long_amount, 2),
+        "short_amount": round(short_amount, 2),
+        "price_a": round(price_a, 4),
+        "price_b": round(price_b, 4),
+    }
+
+
+
 
 _RISK_PRESETS: dict[str, dict[str, float]] = {
     "LOW": {"entry_z": 2.5, "exit_z": 0.75, "allocation_pct": 0.35},
@@ -74,7 +155,6 @@ def generate_strategy_plan(
     ticker_a: str | None = None,
     ticker_b: str | None = None,
 ) -> StrategyPlan:
-    """Create simple strategy guidance based on risk appetite and latest spread stats."""
 
     def _clean_label(label: str | None, fallback: str) -> str:
         if not label:
@@ -91,16 +171,21 @@ def generate_strategy_plan(
     entry_z = float(preset["entry_z"])
     exit_z = float(preset["exit_z"])
     allocation_pct = float(preset["allocation_pct"])
-    
+
     spread_value = 0.0
     zscore_value = 0.0
     rationale = "Configure Pair Analysis to unlock live spread context."
+    hedge = None
+    prices = None
 
     if pair_result is not None:
         spread_value = float(pair_result.last_spread)
         zscore_value = float(pair_result.last_zscore)
         rationale = "Spread deviation versus long-term equilibrium."
+        hedge = pair_result.hedge_ratio
+        prices = pair_result.prices  # DataFrame with columns "A", "B"
 
+    # Determine signal
     signal_type = "Wait for Entry"
     if zscore_value >= entry_z:
         signal_type = f"Short {label_a} Long {label_b}"
@@ -122,6 +207,12 @@ def generate_strategy_plan(
         zscore_value=zscore_value,
         allocation_pct=allocation_pct,
         suggested_notional=suggested_notional,
+
+        # 🔥 新增字段：给 position sizing 用
+        prices=prices,
+        hedge_ratio=hedge,
+        ticker_a=label_a,
+        ticker_b=label_b,
     )
 
 
