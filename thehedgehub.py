@@ -44,17 +44,6 @@ def make_home_panel() -> ui.nav_panel:
                         style="color:#00E6A8; opacity:0.85;",
                     ),
                     ui.hr(),
-                    # ---------------- Video ----------------
-                    ui.div(
-                        ui.tags.iframe(
-                            src="https://www.youtube.com/embed/xeG0kFzV2WM",
-                            width="100%",
-                            height="380px",
-                            style="border:none; border-radius:15px;",
-                        ),
-                        style="max-width:900px; margin:0 auto;",
-                    ),
-                    ui.hr(),
                     # ---------------- Feature Cards ----------------
                     ui.div(
                         {
