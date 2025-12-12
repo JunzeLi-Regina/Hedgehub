@@ -1020,7 +1020,11 @@ def server(input, output, session):
             font_color="#CCCCCC",
             legend_font_color="#CCCCCC",
         )
-        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_xaxes(
+            showgrid=False,
+            zeroline=False,
+            tickformat="%b %Y",
+        )
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
 
