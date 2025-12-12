@@ -1023,7 +1023,6 @@ def server(input, output, session):
         fig.update_xaxes(
             showgrid=False,
             zeroline=False,
-            type="date",
             tickformat="%b %Y",
             dtick="M1",
             ticklabelmode="period",
@@ -1042,6 +1041,7 @@ def server(input, output, session):
 
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        price_df["date"] = pd.to_datetime(price_df["date"], errors="coerce")
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -1062,6 +1062,7 @@ def server(input, output, session):
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -1076,6 +1077,7 @@ def server(input, output, session):
             return px.line()
 
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
