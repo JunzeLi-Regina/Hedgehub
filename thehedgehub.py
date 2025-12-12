@@ -44,17 +44,6 @@ def make_home_panel() -> ui.nav_panel:
                         style="color:#00E6A8; opacity:0.85;",
                     ),
                     ui.hr(),
-                    # ---------------- Video ----------------
-                    ui.div(
-                        ui.tags.iframe(
-                            src="https://www.youtube.com/embed/xeG0kFzV2WM",
-                            width="100%",
-                            height="380px",
-                            style="border:none; border-radius:15px;",
-                        ),
-                        style="max-width:900px; margin:0 auto;",
-                    ),
-                    ui.hr(),
                     # ---------------- Feature Cards ----------------
                     ui.div(
                         {
@@ -220,30 +209,27 @@ def make_pair_panel() -> ui.nav_panel:
                         "and the standardized Z-score signal when applicable.",
                         style="color:#CCCCCC;",
                     ),
-                    ui.layout_columns(
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Price Trend", style="color:#00E6A8;"),
-                                output_widget("price_trend_chart"),
-                            ),
+                    ui.tags.div(
+                        {
+                            "style": (
+                                "display:flex; flex-direction:column; gap:16px; "
+                                "width:100%;"
+                            )
+                        },
+                        ui.card(
+                            ui.h5("Price Trend", style="color:#00E6A8;"),
+                            output_widget("price_trend_chart"),
                         ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
-                                output_widget("spread_chart"),
+                        ui.card(
+                            ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
+                            output_widget("spread_chart"),
                             ),
-                        ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5(
-                                    "Z-Score (Pairs Trading Only)",
-                                    style="color:#00E6A8;",
-                                ),
-                                output_widget("zscore_chart"),
+                        ui.card(
+                            ui.h5(
+                                "Z-Score (Pairs Trading Only)",
+                                style="color:#00E6A8;",
                             ),
+                            output_widget("zscore_chart"),
                         ),
                     ),
                 ),
