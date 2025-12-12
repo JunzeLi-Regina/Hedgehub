@@ -1023,7 +1023,11 @@ def server(input, output, session):
         fig.update_xaxes(
             showgrid=False,
             zeroline=False,
+            type="date",
             tickformat="%b %Y",
+            dtick="M1",
+            ticklabelmode="period",
+            hoverformat="%b %Y",
         )
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
