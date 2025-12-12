@@ -182,6 +182,7 @@ def make_pair_panel() -> ui.nav_panel:
                     ui.input_text("stock_a", "Stock A (e.g., AAPL)", ""),
                     ui.input_text("stock_b", "Stock B (e.g., MSFT)", ""),
                     ui.input_date_range("date_range", "Date Range"),
+                    ui.input_numeric("threshhold_p", "Threshhold P", 0.05),
                     ui.input_numeric(
                         "initial_capital",
                         "Initial Capital ($)",
@@ -821,12 +822,14 @@ def server(input, output, session):
             return
 
         start, end = date_range
+        p_threshold = float(input.threshhold_p() or 0.05)
         try:
             result = analyze_pair(
                 ticker_a=ticker_a,
                 ticker_b=ticker_b,
                 start=str(start),
                 end=str(end),
+                p_threshold=p_threshold, 
             )
         except Exception as err:
             analysis_result.set(None)

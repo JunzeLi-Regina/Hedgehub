@@ -375,6 +375,7 @@ def analyze_pair(
     end: str,
     entry_z: float = 2.0,
     exit_z: float = 0.5,
+    p_threshold: float = 0.05
 ) -> PairResult:
     prices_a = download_prices(ticker_a, start, end)
     prices_b = download_prices(ticker_b, start, end)
@@ -388,7 +389,7 @@ def analyze_pair(
     spread = df["A"] - beta * df["B"]
 
     pvalue = adf_test(spread)
-    pair_ok = pvalue < 0.05
+    pair_ok = p_threshold
 
     mean_spread = spread.mean()
     std_spread = spread.std(ddof=1)
@@ -530,7 +531,7 @@ def analyze_pair_momentum(
         )
 
     return PairResult(
-        pair_ok=False,              # not cointegrated
+        pair_ok=False,              
         mode="momentum",
         signal=signal,
         explanation=explanation,
@@ -542,6 +543,6 @@ def analyze_pair_momentum(
         prices=display_prices,
         spread_zscores=None,
         performance=None,
-        entry_z=None,
+        entry_z=None, 
         exit_z=None,
     )
