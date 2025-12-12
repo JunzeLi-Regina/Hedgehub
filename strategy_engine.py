@@ -375,7 +375,7 @@ def analyze_pair(
     end: str,
     entry_z: float = 2.0,
     exit_z: float = 0.5,
-    p_threshold: float = 0.05
+    p_threshold: float = 0.05,
 ) -> PairResult:
     prices_a = download_prices(ticker_a, start, end)
     prices_b = download_prices(ticker_b, start, end)
@@ -389,7 +389,9 @@ def analyze_pair(
     spread = df["A"] - beta * df["B"]
 
     pvalue = adf_test(spread)
-    pair_ok = p_threshold
+    # ADF test null hypothesis: unit root (non-stationary).
+    # We consider the spread cointegrated/stationary when p-value is below the threshold.
+    pair_ok = bool(pvalue < p_threshold)
 
     mean_spread = spread.mean()
     std_spread = spread.std(ddof=1)
