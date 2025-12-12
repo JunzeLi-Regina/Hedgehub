@@ -44,17 +44,6 @@ def make_home_panel() -> ui.nav_panel:
                         style="color:#00E6A8; opacity:0.85;",
                     ),
                     ui.hr(),
-                    # ---------------- Video ----------------
-                    ui.div(
-                        ui.tags.iframe(
-                            src="https://www.youtube.com/embed/xeG0kFzV2WM",
-                            width="100%",
-                            height="380px",
-                            style="border:none; border-radius:15px;",
-                        ),
-                        style="max-width:900px; margin:0 auto;",
-                    ),
-                    ui.hr(),
                     # ---------------- Feature Cards ----------------
                     ui.div(
                         {
@@ -220,30 +209,27 @@ def make_pair_panel() -> ui.nav_panel:
                         "and the standardized Z-score signal when applicable.",
                         style="color:#CCCCCC;",
                     ),
-                    ui.layout_columns(
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Price Trend", style="color:#00E6A8;"),
-                                output_widget("price_trend_chart"),
-                            ),
+                    ui.tags.div(
+                        {
+                            "style": (
+                                "display:flex; flex-direction:column; gap:16px; "
+                                "width:100%;"
+                            )
+                        },
+                        ui.card(
+                            ui.h5("Price Trend", style="color:#00E6A8;"),
+                            output_widget("price_trend_chart"),
                         ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
-                                output_widget("spread_chart"),
-                            ),
+                        ui.card(
+                            ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
+                            output_widget("spread_chart"),
                         ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5(
-                                    "Z-Score (Pairs Trading Only)",
-                                    style="color:#00E6A8;",
-                                ),
-                                output_widget("zscore_chart"),
+                        ui.card(
+                            ui.h5(
+                                "Z-Score (Pairs Trading Only)",
+                                style="color:#00E6A8;",
                             ),
+                            output_widget("zscore_chart"),
                         ),
                     ),
                 ),
@@ -1034,9 +1020,25 @@ def server(input, output, session):
             font_color="#CCCCCC",
             legend_font_color="#CCCCCC",
         )
-        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_xaxes(
+            showgrid=False,
+            zeroline=False,
+            tickformat="%b %Y",
+            tickmode="auto",
+            nticks=8,
+            automargin=True,
+        )
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
+
+    def _coerce_datetime(values: pd.Series) -> pd.Series:
+        converted = pd.to_datetime(values, errors="coerce")
+        if converted.notna().any():
+            tz = getattr(converted.dt, "tz", None)
+            if tz is not None:
+                converted = converted.dt.tz_convert(None)
+            return converted
+        return values
 
     @render_widget
     def price_trend_chart():
@@ -1048,6 +1050,7 @@ def server(input, output, session):
 
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        price_df["date"] = _coerce_datetime(price_df["date"])
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -1068,6 +1071,7 @@ def server(input, output, session):
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
+        df["date"] = _coerce_datetime(df["date"])
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -1082,6 +1086,7 @@ def server(input, output, session):
             return px.line()
 
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
+        df["date"] = _coerce_datetime(df["date"])
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
