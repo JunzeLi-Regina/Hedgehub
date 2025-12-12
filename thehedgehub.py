@@ -209,30 +209,27 @@ def make_pair_panel() -> ui.nav_panel:
                         "and the standardized Z-score signal when applicable.",
                         style="color:#CCCCCC;",
                     ),
-                    ui.layout_columns(
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Price Trend", style="color:#00E6A8;"),
-                                output_widget("price_trend_chart"),
-                            ),
+                    ui.tags.div(
+                        {
+                            "style": (
+                                "display:flex; flex-direction:column; gap:16px; "
+                                "width:100%;"
+                            )
+                        },
+                        ui.card(
+                            ui.h5("Price Trend", style="color:#00E6A8;"),
+                            output_widget("price_trend_chart"),
                         ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
-                                output_widget("spread_chart"),
-                            ),
+                        ui.card(
+                            ui.h5("Long Spread / Ratio", style="color:#00E6A8;"),
+                            output_widget("spread_chart"),
                         ),
-                        ui.column(
-                            12,
-                            ui.card(
-                                ui.h5(
-                                    "Z-Score (Pairs Trading Only)",
-                                    style="color:#00E6A8;",
-                                ),
-                                output_widget("zscore_chart"),
+                        ui.card(
+                            ui.h5(
+                                "Z-Score (Pairs Trading Only)",
+                                style="color:#00E6A8;",
                             ),
+                            output_widget("zscore_chart"),
                         ),
                     ),
                 ),
