@@ -389,7 +389,7 @@ def analyze_pair(
     spread = df["A"] - beta * df["B"]
 
     pvalue = adf_test(spread)
-    pair_ok = p_threshold
+    pair_ok = pvalue < p_threshold
 
     mean_spread = spread.mean()
     std_spread = spread.std(ddof=1)
