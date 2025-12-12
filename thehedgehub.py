@@ -1024,12 +1024,21 @@ def server(input, output, session):
             showgrid=False,
             zeroline=False,
             tickformat="%b %Y",
-            dtick="M1",
-            ticklabelmode="period",
-            hoverformat="%b %Y",
+            tickmode="auto",
+            nticks=8,
+            automargin=True,
         )
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
+
+    def _coerce_datetime(values: pd.Series) -> pd.Series:
+        converted = pd.to_datetime(values, errors="coerce")
+        if converted.notna().any():
+            tz = getattr(converted.dt, "tz", None)
+            if tz is not None:
+                converted = converted.dt.tz_convert(None)
+            return converted
+        return values
 
     @render_widget
     def price_trend_chart():
@@ -1041,7 +1050,7 @@ def server(input, output, session):
 
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
-        price_df["date"] = pd.to_datetime(price_df["date"], errors="coerce")
+        price_df["date"] = _coerce_datetime(price_df["date"])
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -1062,7 +1071,7 @@ def server(input, output, session):
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["date"] = _coerce_datetime(df["date"])
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -1077,7 +1086,7 @@ def server(input, output, session):
             return px.line()
 
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["date"] = _coerce_datetime(df["date"])
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
