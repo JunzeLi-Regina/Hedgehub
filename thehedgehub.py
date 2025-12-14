@@ -417,6 +417,8 @@ app_ui = ui.page_fillable(
                 color: #FFFFFF !important;
                 background-color: transparent;
                 border: none;
+                white-space: normal !important;
+                word-break: break-word !important;
             }
             table, th, td, .dataframe, .dataframe th, .dataframe td {
                 color: #CCCCCC !important;
@@ -451,6 +453,7 @@ app_ui = ui.page_fillable(
             }
             h1, h3, h4 { color:#00E6A8; }
             p { color:#CCCCCC !important; }
+            
         """
         ),
     ),
