@@ -895,10 +895,27 @@ def server(input, output, session):
         error_message = analysis_error.get()
 
         if result is not None:
-            return result.explanation
+            base_text = result.explanation
+
+            # -----------------------------
+            # Add professor-requested line:
+            # Dollar-neutral suggested direction
+            # -----------------------------
+            if result.signal and ("long" in result.signal.lower() or "short" in result.signal.lower()):
+                # Example: "short AAPL and long MSFT"
+                direction = result.signal.lower()
+
+                base_text += (
+                    f"\n\nSuggested result for a dollar-neutral trade: {direction}."
+                )
+
+            return base_text
+
         if error_message:
             return error_message
+
         return "Enter stock tickers and a date range, then click Run Pair Test."
+
 
     @render.data_frame
     def performance_metrics():
