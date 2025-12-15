@@ -1038,11 +1038,19 @@ def server(input, output, session):
             start_ts = pd.to_datetime(start, errors="coerce")
             end_ts = pd.to_datetime(end, errors="coerce")
             if pd.notna(start_ts) and pd.notna(end_ts):
-                x_range = [start_ts, end_ts]
+                # Include the full end day to avoid clipping the last point
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
 
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
         price_df["date"] = pd.to_datetime(price_df["date"], errors="coerce")
+        # If dates are timezone-aware, normalize to naive timestamps
+        if getattr(price_df["date"].dt, "tz", None) is not None:
+            price_df["date"] = price_df["date"].dt.tz_convert(None)
+        price_df = price_df.dropna(subset=["date"])
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -1069,12 +1077,18 @@ def server(input, output, session):
             start_ts = pd.to_datetime(start, errors="coerce")
             end_ts = pd.to_datetime(end, errors="coerce")
             if pd.notna(start_ts) and pd.notna(end_ts):
-                x_range = [start_ts, end_ts]
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
 
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        if getattr(df["date"].dt, "tz", None) is not None:
+            df["date"] = df["date"].dt.tz_convert(None)
+        df = df.dropna(subset=["date"])
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -1097,10 +1111,16 @@ def server(input, output, session):
             start_ts = pd.to_datetime(start, errors="coerce")
             end_ts = pd.to_datetime(end, errors="coerce")
             if pd.notna(start_ts) and pd.notna(end_ts):
-                x_range = [start_ts, end_ts]
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
 
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        if getattr(df["date"].dt, "tz", None) is not None:
+            df["date"] = df["date"].dt.tz_convert(None)
+        df = df.dropna(subset=["date"])
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
