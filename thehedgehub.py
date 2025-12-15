@@ -1033,7 +1033,13 @@ def server(input, output, session):
             font_color="#CCCCCC",
             legend_font_color="#CCCCCC",
         )
-        fig.update_xaxes(showgrid=False, zeroline=False)
+        fig.update_xaxes(
+            showgrid=False,
+            zeroline=False,
+            type="date",
+            tickformat="%Y-%m-%d",
+            hoverformat="%Y-%m-%d",
+        )
         fig.update_yaxes(showgrid=False, zeroline=False)
         return fig
 
@@ -1045,8 +1051,26 @@ def server(input, output, session):
         if prices is None or prices.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                # Include the full end day to avoid clipping the last point
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
+
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
+        price_df["date"] = pd.to_datetime(price_df["date"], errors="coerce")
+        # If dates are timezone-aware, normalize to naive timestamps
+        if getattr(price_df["date"].dt, "tz", None) is not None:
+            price_df["date"] = price_df["date"].dt.tz_convert(None)
+        price_df = price_df.dropna(subset=["date"])
         value_cols = [c for c in price_df.columns if c != "date"]
 
         fig = px.line(
@@ -1055,6 +1079,8 @@ def server(input, output, session):
             y=value_cols,
             color_discrete_sequence=["#00E6A8", "#00A2FF"],
         )
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render_widget
@@ -1064,12 +1090,30 @@ def server(input, output, session):
         if result is None or result.spread_series.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
+
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        if getattr(df["date"].dt, "tz", None) is not None:
+            df["date"] = df["date"].dt.tz_convert(None)
+        df = df.dropna(subset=["date"])
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render_widget
@@ -1080,7 +1124,23 @@ def server(input, output, session):
         if zscores is None or zscores.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                x_range = [
+                    start_ts,
+                    end_ts + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1),
+                ]
+
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        if getattr(df["date"].dt, "tz", None) is not None:
+            df["date"] = df["date"].dt.tz_convert(None)
+        df = df.dropna(subset=["date"])
 
         fig = px.line(df, x="date", y="zscore", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
@@ -1088,6 +1148,8 @@ def server(input, output, session):
         fig.add_hline(y=-2, line_dash="dot", line_color="#FFB347", opacity=0.6)
         fig.add_hline(y=0.5, line_dash="dash", line_color="#888888", opacity=0.4)
         fig.add_hline(y=-0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render.text
