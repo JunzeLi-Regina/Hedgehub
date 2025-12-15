@@ -1016,6 +1016,7 @@ def server(input, output, session):
         fig.update_xaxes(
             showgrid=False,
             zeroline=False,
+            type="date",
             tickformat="%Y-%m-%d",
             hoverformat="%Y-%m-%d",
         )
