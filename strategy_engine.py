@@ -342,6 +342,13 @@ def run_pairs_trading_backtest(
 # Helpers
 # ---------------------------------------------------------
 def download_prices(ticker: str, start: str, end: str) -> pd.Series:
+    # yfinance treats `end` as exclusive, but our UI Date Range is inclusive.
+    # Add one day so charts/data include the user's selected end date.
+    end_dt = pd.to_datetime(end, errors="coerce")
+    if pd.notna(end_dt):
+        end_dt = end_dt + pd.Timedelta(days=1)
+        end = end_dt.strftime("%Y-%m-%d")
+
     data = yf.download(
         ticker,
         start=start,

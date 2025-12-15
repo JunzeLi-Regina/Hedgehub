@@ -1031,6 +1031,15 @@ def server(input, output, session):
         if prices is None or prices.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                x_range = [start_ts, end_ts]
+
         price_df = prices.copy().reset_index()
         price_df.rename(columns={price_df.columns[0]: "date"}, inplace=True)
         price_df["date"] = pd.to_datetime(price_df["date"], errors="coerce")
@@ -1042,6 +1051,8 @@ def server(input, output, session):
             y=value_cols,
             color_discrete_sequence=["#00E6A8", "#00A2FF"],
         )
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render_widget
@@ -1051,6 +1062,15 @@ def server(input, output, session):
         if result is None or result.spread_series.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                x_range = [start_ts, end_ts]
+
         df = pd.DataFrame(
             {"date": result.spread_series.index, "spread": result.spread_series.values}
         )
@@ -1058,6 +1078,8 @@ def server(input, output, session):
 
         fig = px.line(df, x="date", y="spread", color_discrete_sequence=["#00E6A8"])
         fig.update_traces(line_width=2)
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render_widget
@@ -1068,6 +1090,15 @@ def server(input, output, session):
         if zscores is None or zscores.empty:
             return px.line()
 
+        date_range = input.date_range()
+        x_range = None
+        if date_range:
+            start, end = date_range
+            start_ts = pd.to_datetime(start, errors="coerce")
+            end_ts = pd.to_datetime(end, errors="coerce")
+            if pd.notna(start_ts) and pd.notna(end_ts):
+                x_range = [start_ts, end_ts]
+
         df = pd.DataFrame({"date": zscores.index, "zscore": zscores.values})
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
@@ -1077,6 +1108,8 @@ def server(input, output, session):
         fig.add_hline(y=-2, line_dash="dot", line_color="#FFB347", opacity=0.6)
         fig.add_hline(y=0.5, line_dash="dash", line_color="#888888", opacity=0.4)
         fig.add_hline(y=-0.5, line_dash="dash", line_color="#888888", opacity=0.4)
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
         return _style_figure(fig)
 
     @render.text
